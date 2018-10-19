@@ -61,14 +61,16 @@ the more familiar unconstrained `non-linear least squares problem
 =====================
 
 For each term in the objective function, a :class:`CostFunction` is
-responsible for computing a vector of residuals and if asked a vector
-of Jacobian matrices, i.e., given :math:`\left[x_{i_1}, ... ,
-x_{i_k}\right]`, compute the vector
-:math:`f_i\left(x_{i_1},...,x_{i_k}\right)` and the matrices
+responsible for computing a vector of residuals and Jacobian
+matrices. Concretely, consider a function
+:math:`f\left(x_{1},...,x_{k}\right)` that depends on parameter blocks
+:math:`\left[x_{1}, ... , x_{k}\right]`.
 
- .. math:: J_{ij} = \frac{\partial}{\partial
-           x_{i_j}}f_i\left(x_{i_1},...,x_{i_k}\right),\quad \forall j
-           \in \{1, \ldots, k\}
+Then, given :math:`\left[x_{1}, ... , x_{k}\right]`,
+:class:`CostFunction` is responsible for computing the vector
+:math:`f\left(x_{1},...,x_{k}\right)` and the Jacobian matrices
+
+.. math:: J_i =  \frac{\partial}{\partial x_i} f(x_1, ..., x_k) \quad \forall i \in \{1, \ldots, k\}
 
 .. class:: CostFunction
 
@@ -100,37 +102,42 @@ the corresponding accessors. This information will be verified by the
 
    Compute the residual vector and the Jacobian matrices.
 
-   ``parameters`` is an array of pointers to arrays containing the
-   various parameter blocks. ``parameters`` has the same number of
-   elements as :member:`CostFunction::parameter_block_sizes_` and the
-   parameter blocks are in the same order as
-   :member:`CostFunction::parameter_block_sizes_`.
+   ``parameters`` is an array of arrays of size
+   ``CostFunction::parameter_block_sizes_.size()`` and
+   ``parameters[i]`` is an array of size ``parameter_block_sizes_[i]``
+   that contains the :math:`i^{\text{th}}` parameter block that the
+   ``CostFunction`` depends on.
+
+   ``parameters`` is never ``NULL``.
 
    ``residuals`` is an array of size ``num_residuals_``.
 
-   ``jacobians`` is an array of size
-   :member:`CostFunction::parameter_block_sizes_` containing pointers
-   to storage for Jacobian matrices corresponding to each parameter
-   block. The Jacobian matrices are in the same order as
-   :member:`CostFunction::parameter_block_sizes_`. ``jacobians[i]`` is
-   an array that contains :member:`CostFunction::num_residuals_` x
-   :member:`CostFunction::parameter_block_sizes_` ``[i]``
-   elements. Each Jacobian matrix is stored in row-major order, i.e.,
-   ``jacobians[i][r * parameter_block_size_[i] + c]`` =
-   :math:`\frac{\partial residual[r]}{\partial parameters[i][c]}`
+   ``residuals`` is never ``NULL``.
 
+   ``jacobians`` is an array of arrays of size
+   ``CostFunction::parameter_block_sizes_.size()``.
 
-   If ``jacobians`` is ``NULL``, then no derivatives are returned;
-   this is the case when computing cost only. If ``jacobians[i]`` is
-   ``NULL``, then the Jacobian matrix corresponding to the
-   :math:`i^{\textrm{th}}` parameter block must not be returned, this
-   is the case when a parameter block is marked constant.
+   If ``jacobians`` is ``NULL``, the user is only expected to compute
+   the residuals.
 
-   **NOTE** The return value indicates whether the computation of the
-   residuals and/or jacobians was successful or not.
+   ``jacobians[i]`` is a row-major array of size ``num_residuals x
+   parameter_block_sizes_[i]``.
 
-   This can be used to communicate numerical failures in Jacobian
-   computations for instance.
+   If ``jacobians[i]`` is **not** ``NULL``, the user is required to
+   compute the Jacobian of the residual vector with respect to
+   ``parameters[i]`` and store it in this array, i.e.
+
+   ``jacobians[i][r * parameter_block_sizes_[i] + c]`` =
+   :math:`\frac{\displaystyle \partial \text{residual}[r]}{\displaystyle \partial \text{parameters}[i][c]}`
+
+   If ``jacobians[i]`` is ``NULL``, then this computation can be
+   skipped. This is the case when the corresponding parameter block is
+   marked constant.
+
+   The return value indicates whether the computation of the residuals
+   and/or jacobians was successful or not. This can be used to
+   communicate numerical failures in Jacobian computations for
+   instance.
 
 :class:`SizedCostFunction`
 ==========================
@@ -1530,6 +1537,7 @@ Instances
    once, regardless of how many residual blocks refer to them.
 
 .. function:: ResidualBlockId Problem::AddResidualBlock(CostFunction* cost_function, LossFunction* loss_function, const vector<double*> parameter_blocks)
+.. function:: ResidualBlockId Problem::AddResidualBlock(CostFunction* cost_function, LossFunction* loss_function, double *x0, double *x1, ...)
 
    Add a residual block to the overall cost function. The cost
    function carries with it information about the sizes of the
@@ -1538,6 +1546,9 @@ Instances
    program aborts if a mismatch is detected. loss_function can be
    NULL, in which case the cost of the term is just the squared norm
    of the residuals.
+
+   The parameter blocks may be passed together as a
+   ``vector<double*>``, or as up to ten separate ``double*`` pointers.
 
    The user has the option of explicitly adding the parameter blocks
    using AddParameterBlock. This causes additional correctness
@@ -1564,12 +1575,18 @@ Instances
       double x1[] = {1.0, 2.0, 3.0};
       double x2[] = {1.0, 2.0, 5.0, 6.0};
       double x3[] = {3.0, 6.0, 2.0, 5.0, 1.0};
+      vector<double*> v1;
+      v1.push_back(x1);
+      vector<double*> v2;
+      v2.push_back(x2);
+      v2.push_back(x1);
 
       Problem problem;
 
       problem.AddResidualBlock(new MyUnaryCostFunction(...), NULL, x1);
       problem.AddResidualBlock(new MyBinaryCostFunction(...), NULL, x2, x1);
-
+      problem.AddResidualBlock(new MyUnaryCostFunction(...), NULL, v1);
+      problem.AddResidualBlock(new MyBinaryCostFunction(...), NULL, v2);
 
 .. function:: void Problem::AddParameterBlock(double* values, int size, LocalParameterization* local_parameterization)
 
@@ -1644,13 +1661,27 @@ Instances
 
    Set the lower bound for the parameter at position `index` in the
    parameter block corresponding to `values`. By default the lower
-   bound is :math:`-\infty`.
+   bound is ``-std::numeric_limits<double>::max()``, which is treated
+   by the solver as the same as :math:`-\infty`.
 
 .. function:: void Problem::SetParameterUpperBound(double* values, int index, double upper_bound)
 
    Set the upper bound for the parameter at position `index` in the
    parameter block corresponding to `values`. By default the value is
-   :math:`\infty`.
+   ``std::numeric_limits<double>::max()``, which is treated by the
+   solver as the same as :math:`\infty`.
+
+.. function:: double Problem::GetParameterLowerBound(double* values, int index)
+
+   Get the lower bound for the parameter with position `index`. If the
+   parameter is not bounded by the user, then its lower bound is
+   ``-std::numeric_limits<double>::max()``.
+
+.. function:: double Problem::GetParameterUpperBound(double* values, int index)
+
+   Get the upper bound for the parameter with position `index`. If the
+   parameter is not bounded by the user, then its upper bound is
+   ``std::numeric_limits<double>::max()``.
 
 .. function:: int Problem::NumParameterBlocks() const
 
@@ -1794,7 +1825,7 @@ Instances
    performed. This vector determines the order in which the residuals
    occur, and how the rows of the jacobian are ordered. If
    residual_blocks is empty, then it is assumed to be equal to the
-   vector containing all the parameter blocks.
+   vector containing all the residual blocks.
 
 .. member:: bool Problem::EvaluateOptions::apply_loss_function
 

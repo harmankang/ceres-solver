@@ -32,35 +32,21 @@
 #define CERES_INTERNAL_THREAD_TOKEN_PROVIDER_H_
 
 #include "ceres/internal/config.h"
+#include "ceres/internal/port.h"
 
-#if defined(CERES_USE_OPENMP)
-#  if defined(CERES_USE_TBB) || defined(CERES_NO_THREADS)
-#    error CERES_USE_OPENMP is mutually exclusive to CERES_USE_TBB and CERES_NO_THREADS
-#  endif
-#elif defined(CERES_USE_TBB)
-#  if defined(CERES_USE_OPENMP) || defined(CERES_NO_THREADS)
-#    error CERES_USE_TBB is mutually exclusive to CERES_USE_OPENMP and CERES_NO_THREADS
-#  endif
-#elif defined(CERES_NO_THREADS)
-#  if defined(CERES_USE_OPENMP) || defined(CERES_USE_TBB)
-#    error CERES_NO_THREADS is mutually exclusive to CERES_USE_OPENMP and CERES_USE_TBB
-#  endif
-#else
-#  error One of CERES_USE_OPENMP, CERES_USE_TBB or CERES_NO_THREADS must be defined.
-#endif
-
-#ifdef CERES_USE_TBB
-#include <tbb/concurrent_queue.h>
+#ifdef CERES_USE_CXX11_THREADS
+#include "ceres/concurrent_queue.h"
 #endif
 
 namespace ceres {
 namespace internal {
 
-// Helper for TBB thread number identification that is similar to
-// omp_get_thread_num() behaviour. This is necessary to support TBB threading
-// with a sequential thread id. This is used to access preallocated resources in
-// the parallelized code parts.  The sequence of tokens varies from 0 to
-// num_threads - 1 that can be acquired to identify the thread in a thread pool.
+// Helper for C++11 thread number identification that is similar to
+// omp_get_thread_num() behaviour. This is necessary to support C++11
+// threading with a sequential thread id. This is used to access preallocated
+// resources in the parallelized code parts.  The sequence of tokens varies from
+// 0 to num_threads - 1 that can be acquired to identify the thread in a thread
+// pool.
 //
 // If CERES_NO_THREADS is defined, Acquire() always returns 0 and Release()
 // takes no action.
@@ -86,20 +72,19 @@ class ThreadTokenProvider {
 
   // Returns the first token from the queue. The acquired value must be
   // given back by Release().
-  //
-  // With TBB this function will block if all the tokens are aquired by
-  // concurent threads.
   int Acquire();
 
   // Makes previously acquired token available for other threads.
   void Release(int thread_id);
 
  private:
-#ifdef CERES_USE_TBB
+#ifdef CERES_USE_CXX11_THREADS
   // This queue initially holds a sequence from 0..num_threads-1. Every
   // Acquire() call the first number is removed from here. When the token is not
-  // needed anymore it shall be given back with corresponding Release() call.
-  tbb::concurrent_bounded_queue<int> pool_;
+  // needed anymore it shall be given back with corresponding Release()
+  // call. This concurrent queue is more expensive than TBB's version, so you
+  // should not acquire the thread ID on every for loop iteration.
+  ConcurrentQueue<int> pool_;
 #endif
 
   ThreadTokenProvider(ThreadTokenProvider&);

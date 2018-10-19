@@ -31,10 +31,11 @@
 #include "ceres/solver.h"
 
 #include <limits>
+#include <memory>
 #include <cmath>
 #include <vector>
 #include "gtest/gtest.h"
-#include "ceres/internal/scoped_ptr.h"
+#include "ceres/evaluation_callback.h"
 #include "ceres/autodiff_cost_function.h"
 #include "ceres/sized_cost_function.h"
 #include "ceres/problem.h"
@@ -84,11 +85,20 @@ struct RememberingCallback : public IterationCallback {
   std::vector<double> x_values;
 };
 
+struct NoOpEvaluationCallback : EvaluationCallback {
+  virtual ~NoOpEvaluationCallback() {}
+  virtual void PrepareForEvaluation(bool evaluate_jacobians,
+                                    bool new_evaluation_point) {
+    (void) evaluate_jacobians;
+    (void) new_evaluation_point;
+  }
+};
+
 TEST(Solver, UpdateStateEveryIterationOption) {
   double x = 50.0;
   const double original_x = x;
 
-  scoped_ptr<CostFunction> cost_function(QuadraticCostFunctor::Create());
+  std::unique_ptr<CostFunction> cost_function(QuadraticCostFunctor::Create());
   Problem::Options problem_options;
   problem_options.cost_function_ownership = DO_NOT_TAKE_OWNERSHIP;
   Problem problem(problem_options);
@@ -104,7 +114,14 @@ TEST(Solver, UpdateStateEveryIterationOption) {
 
   int num_iterations;
 
-  // First try: no updating.
+  // There are four cases that need to be checked:
+  //
+  //   (update_state_every_iteration = true|false) X
+  //   (evaluation_callback = NULL|provided)
+  //
+  // These need to get checked since there is some interaction between them.
+
+  // First: update_state_every_iteration=false, evaluation_callback=NULL.
   Solve(options, &problem, &summary);
   num_iterations = summary.num_successful_steps +
                    summary.num_unsuccessful_steps;
@@ -113,9 +130,35 @@ TEST(Solver, UpdateStateEveryIterationOption) {
     EXPECT_EQ(50.0, callback.x_values[i]);
   }
 
-  // Second try: with updating
+  // Second: update_state_every_iteration=true, evaluation_callback=NULL.
   x = 50.0;
   options.update_state_every_iteration = true;
+  callback.x_values.clear();
+  Solve(options, &problem, &summary);
+  num_iterations = summary.num_successful_steps +
+                   summary.num_unsuccessful_steps;
+  EXPECT_GT(num_iterations, 1);
+  EXPECT_EQ(original_x, callback.x_values[0]);
+  EXPECT_NE(original_x, callback.x_values[1]);
+
+  NoOpEvaluationCallback evaluation_callback;
+
+  // Third: update_state_every_iteration=true, evaluation_callback=!NULL.
+  x = 50.0;
+  options.update_state_every_iteration = true;
+  options.evaluation_callback = &evaluation_callback;
+  callback.x_values.clear();
+  Solve(options, &problem, &summary);
+  num_iterations = summary.num_successful_steps +
+                   summary.num_unsuccessful_steps;
+  EXPECT_GT(num_iterations, 1);
+  EXPECT_EQ(original_x, callback.x_values[0]);
+  EXPECT_NE(original_x, callback.x_values[1]);
+
+  // Fourth: update_state_every_iteration=false, evaluation_callback=!NULL.
+  x = 50.0;
+  options.update_state_every_iteration = false;
+  options.evaluation_callback = &evaluation_callback;
   callback.x_values.clear();
   Solve(options, &problem, &summary);
   num_iterations = summary.num_successful_steps +
@@ -277,6 +320,24 @@ TEST(Solver, SparseSchurNoCXSparse) {
 }
 #endif
 
+#if defined(CERES_NO_ACCELERATE_SPARSE)
+TEST(Solver, SparseNormalCholeskyNoAccelerateSparse) {
+  Solver::Options options;
+  options.sparse_linear_algebra_library_type = ACCELERATE_SPARSE;
+  options.linear_solver_type = SPARSE_NORMAL_CHOLESKY;
+  string message;
+  EXPECT_FALSE(options.IsValid(&message));
+}
+
+TEST(Solver, SparseSchurNoAccelerateSparse) {
+  Solver::Options options;
+  options.sparse_linear_algebra_library_type = ACCELERATE_SPARSE;
+  options.linear_solver_type = SPARSE_SCHUR;
+  string message;
+  EXPECT_FALSE(options.IsValid(&message));
+}
+#endif
+
 #if !defined(CERES_USE_EIGEN_SPARSE)
 TEST(Solver, SparseNormalCholeskyNoEigenSparse) {
   Solver::Options options;
@@ -368,8 +429,32 @@ TEST(Solver, LinearSolverTypeNormalOperation) {
   EXPECT_TRUE(options.IsValid(&message));
 }
 
-template<int kNumResiduals, int N1 = 0, int N2 = 0, int N3 = 0>
-class DummyCostFunction : public SizedCostFunction<kNumResiduals, N1, N2, N3> {
+TEST(Solver, CantMixEvaluationCallbackWithInnerIterations) {
+  Solver::Options options;
+  NoOpEvaluationCallback evaluation_callback;
+  string message;
+
+  // Can't combine them.
+  options.use_inner_iterations = true;
+  options.evaluation_callback = &evaluation_callback;
+  EXPECT_FALSE(options.IsValid(&message));
+
+  // Either or none is OK.
+  options.use_inner_iterations = false;
+  options.evaluation_callback = &evaluation_callback;
+  EXPECT_TRUE(options.IsValid(&message));
+
+  options.use_inner_iterations = true;
+  options.evaluation_callback = NULL;
+  EXPECT_TRUE(options.IsValid(&message));
+
+  options.use_inner_iterations = false;
+  options.evaluation_callback = NULL;
+  EXPECT_TRUE(options.IsValid(&message));
+}
+
+template <int kNumResiduals, int... Ns>
+class DummyCostFunction : public SizedCostFunction<kNumResiduals, Ns...> {
  public:
   bool Evaluate(double const* const* parameters,
                 double* residuals,

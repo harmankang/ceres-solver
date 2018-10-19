@@ -32,7 +32,6 @@
 #define CERES_INTERNAL_COMPRESSED_ROW_SPARSE_MATRIX_H_
 
 #include <vector>
-#include "ceres/internal/macros.h"
 #include "ceres/internal/port.h"
 #include "ceres/sparse_matrix.h"
 #include "ceres/types.h"
@@ -91,9 +90,7 @@ class CompressedRowSparseMatrix : public SparseMatrix {
   // double the peak memory usage.
   //
   // The storage type is set to UNSYMMETRIC.
-  CompressedRowSparseMatrix(int num_rows,
-                            int num_cols,
-                            int max_num_nonzeros);
+  CompressedRowSparseMatrix(int num_rows, int num_cols, int max_num_nonzeros);
 
   // Build a square sparse diagonal matrix with num_rows rows and
   // columns. The diagonal m(i,i) = diagonal(i);
@@ -108,7 +105,6 @@ class CompressedRowSparseMatrix : public SparseMatrix {
   virtual void LeftMultiply(const double* x, double* y) const;
   virtual void SquaredColumnNorm(double* x) const;
   virtual void ScaleColumns(const double* scale);
-
   virtual void ToDenseMatrix(Matrix* dense_matrix) const;
   virtual void ToTextFile(FILE* file) const;
   virtual int num_rows() const { return num_rows_; }
@@ -160,8 +156,7 @@ class CompressedRowSparseMatrix : public SparseMatrix {
   //
   // Caller owns the result.
   static CompressedRowSparseMatrix* CreateBlockDiagonalMatrix(
-      const double* diagonal,
-      const std::vector<int>& blocks);
+      const double* diagonal, const std::vector<int>& blocks);
 
   // Options struct to control the generation of random block sparse
   // matrices in compressed row sparse format.
@@ -177,27 +172,26 @@ class CompressedRowSparseMatrix : public SparseMatrix {
   // zero or not. If the answer is no, then we generate entries for the
   // block which are distributed normally.
   struct RandomMatrixOptions {
-    RandomMatrixOptions()
-        : num_row_blocks(0),
-          min_row_block_size(0),
-          max_row_block_size(0),
-          num_col_blocks(0),
-          min_col_block_size(0),
-          max_col_block_size(0),
-          block_density(0.0) {
-    }
+    // Type of matrix to create.
+    //
+    // If storage_type is UPPER_TRIANGULAR (LOWER_TRIANGULAR), then
+    // create a square symmetric matrix with just the upper triangular
+    // (lower triangular) part. In this case, num_col_blocks,
+    // min_col_block_size and max_col_block_size will be ignored and
+    // assumed to be equal to the corresponding row settings.
+    StorageType storage_type = UNSYMMETRIC;
 
-    int num_row_blocks;
-    int min_row_block_size;
-    int max_row_block_size;
-    int num_col_blocks;
-    int min_col_block_size;
-    int max_col_block_size;
+    int num_row_blocks = 0;
+    int min_row_block_size = 0;
+    int max_row_block_size = 0;
+    int num_col_blocks = 0;
+    int min_col_block_size = 0;
+    int max_col_block_size = 0;
 
     // 0 < block_density <= 1 is the probability of a block being
     // present in the matrix. A given random matrix will not have
     // precisely this density.
-    double block_density;
+    double block_density = 0.0;
   };
 
   // Create a random CompressedRowSparseMatrix whose entries are
@@ -206,7 +200,7 @@ class CompressedRowSparseMatrix : public SparseMatrix {
   //
   // Caller owns the result.
   static CompressedRowSparseMatrix* CreateRandomMatrix(
-      const RandomMatrixOptions& options);
+      RandomMatrixOptions options);
 
  private:
   static CompressedRowSparseMatrix* FromTripletSparseMatrix(

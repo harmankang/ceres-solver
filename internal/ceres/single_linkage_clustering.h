@@ -31,20 +31,16 @@
 #ifndef CERES_INTERNAL_SINGLE_LINKAGE_CLUSTERING_H_
 #define CERES_INTERNAL_SINGLE_LINKAGE_CLUSTERING_H_
 
-#include "ceres/collections_port.h"
+#include <unordered_map>
 #include "ceres/graph.h"
 
 namespace ceres {
 namespace internal {
 
 struct SingleLinkageClusteringOptions {
-  SingleLinkageClusteringOptions()
-      : min_similarity(0.99) {
-  }
-
   // Graph edges with edge weight less than min_similarity are ignored
   // during the clustering process.
-  double min_similarity;
+  double min_similarity = 0.99;
 };
 
 // Compute a partitioning of the vertices of the graph using the
@@ -60,7 +56,7 @@ struct SingleLinkageClusteringOptions {
 int ComputeSingleLinkageClustering(
     const SingleLinkageClusteringOptions& options,
     const WeightedGraph<int>& graph,
-    HashMap<int, int>* membership);
+    std::unordered_map<int, int>* membership);
 
 }  // namespace internal
 }  // namespace ceres

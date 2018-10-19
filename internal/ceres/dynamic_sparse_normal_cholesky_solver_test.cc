@@ -28,9 +28,10 @@
 //
 // Author: sameeragarwal@google.com (Sameer Agarwal)
 
+#include <memory>
 #include "ceres/casts.h"
 #include "ceres/compressed_row_sparse_matrix.h"
-#include "ceres/internal/scoped_ptr.h"
+#include "ceres/context_impl.h"
 #include "ceres/linear_least_squares_problems.h"
 #include "ceres/linear_solver.h"
 #include "ceres/triplet_sparse_matrix.h"
@@ -49,7 +50,7 @@ namespace internal {
 class DynamicSparseNormalCholeskySolverTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    scoped_ptr<LinearLeastSquaresProblem> problem(
+    std::unique_ptr<LinearLeastSquaresProblem> problem(
         CreateLinearLeastSquaresProblemFromId(1));
     A_.reset(CompressedRowSparseMatrix::FromTripletSparseMatrix(
         *down_cast<TripletSparseMatrix*>(problem->A.get())));
@@ -73,7 +74,7 @@ class DynamicSparseNormalCholeskySolverTest : public ::testing::Test {
     A_->LeftMultiply(b_.get(), rhs.data());
     Vector expected_solution = lhs.llt().solve(rhs);
 
-    scoped_ptr<LinearSolver> solver(LinearSolver::Create(options));
+    std::unique_ptr<LinearSolver> solver(LinearSolver::Create(options));
     LinearSolver::PerSolveOptions per_solve_options;
     per_solve_options.D = D;
     Vector actual_solution(A_->num_cols());
@@ -97,13 +98,15 @@ class DynamicSparseNormalCholeskySolverTest : public ::testing::Test {
     options.dynamic_sparsity = true;
     options.sparse_linear_algebra_library_type =
         sparse_linear_algebra_library_type;
+    ContextImpl context;
+    options.context = &context;
     TestSolver(options, NULL);
     TestSolver(options, D_.get());
   }
 
-  scoped_ptr<CompressedRowSparseMatrix> A_;
-  scoped_array<double> b_;
-  scoped_array<double> D_;
+  std::unique_ptr<CompressedRowSparseMatrix> A_;
+  std::unique_ptr<double[]> b_;
+  std::unique_ptr<double[]> D_;
 };
 
 #ifndef CERES_NO_SUITESPARSE

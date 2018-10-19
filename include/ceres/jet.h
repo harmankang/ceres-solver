@@ -31,7 +31,7 @@
 // A simple implementation of N-dimensional dual numbers, for automatically
 // computing exact derivatives of functions.
 //
-// While a complete treatment of the mechanics of automatic differentation is
+// While a complete treatment of the mechanics of automatic differentiation is
 // beyond the scope of this header (see
 // http://en.wikipedia.org/wiki/Automatic_differentiation for details), the
 // basic idea is to extend normal arithmetic with an extra element, "e," often
@@ -49,7 +49,7 @@
 //   f(x) = x^2 ,
 //
 // evaluated at 10. Using normal arithmetic, f(10) = 100, and df/dx(10) = 20.
-// Next, augument 10 with an infinitesimal to get:
+// Next, argument 10 with an infinitesimal to get:
 //
 //   f(10 + e) = (10 + e)^2
 //             = 100 + 2 * 10 * e + e^2
@@ -102,8 +102,9 @@
 //   }
 //
 //   // The "2" means there should be 2 dual number components.
-//   Jet<double, 2> x(0);  // Pick the 0th dual number for x.
-//   Jet<double, 2> y(1);  // Pick the 1st dual number for y.
+//   // It computes the partial derivative at x=10, y=20.
+//   Jet<double, 2> x(10, 0);  // Pick the 0th dual number for x.
+//   Jet<double, 2> y(20, 1);  // Pick the 1st dual number for y.
 //   Jet<double, 2> z = f(x, y);
 //
 //   LOG(INFO) << "df/dx = " << z.v[0]
@@ -124,7 +125,7 @@
 //
 //   x = a + \sum_i v[i] t_i
 //
-// A shorthand is to write an element as x = a + u, where u is the pertubation.
+// A shorthand is to write an element as x = a + u, where u is the perturbation.
 // Then, the main point about the arithmetic of jets is that the product of
 // perturbations is zero:
 //
@@ -163,7 +164,6 @@
 #include <string>
 
 #include "Eigen/Core"
-#include "ceres/fpclassify.h"
 #include "ceres/internal/port.h"
 
 namespace ceres {
@@ -171,6 +171,7 @@ namespace ceres {
 template <typename T, int N>
 struct Jet {
   enum { DIMENSION = N };
+  typedef T Scalar;
 
   // Default-construct "a" because otherwise this can lead to false errors about
   // uninitialized uses when other classes relying on default constructed T
@@ -253,26 +254,33 @@ struct Jet {
   // We allocate Jets on the stack and other places they might not be aligned
   // to X(=16 [SSE], 32 [AVX] etc)-byte boundaries, which would prevent the safe
   // use of vectorisation.  If we have C++11, we can specify the alignment.
-  // However, the standard gives wide lattitude as to what alignments are valid,
+  // However, the standard gives wide latitude as to what alignments are valid,
   // and it might be that the maximum supported alignment *guaranteed* to be
   // supported is < 16, in which case we do not specify an alignment, as this
   // implies the host is not a modern x86 machine.  If using < C++11, we cannot
   // specify alignment.
-#ifndef CERES_USE_CXX11
-  // Without >= C++11, we cannot specify the alignment so fall back to safe,
-  // unvectorised version.
+
+#if defined(EIGEN_DONT_VECTORIZE)
   Eigen::Matrix<T, N, 1, Eigen::DontAlign> v;
 #else
   // Enable vectorisation iff the maximum supported scalar alignment is >=
   // 16 bytes, as this is the minimum required by Eigen for any vectorisation.
   //
   // NOTE: It might be the case that we could get >= 16-byte alignment even if
-  //       kMaxAlignBytes < 16.  However we can't guarantee that this
+  //       max_align_t < 16.  However we can't guarantee that this
   //       would happen (and it should not for any modern x86 machine) and if it
   //       didn't, we could get misaligned Jets.
   static constexpr int kAlignOrNot =
-      16 <= ::ceres::port_constants::kMaxAlignBytes
-            ? Eigen::AutoAlign : Eigen::DontAlign;
+      // Work around a GCC 4.8 bug
+      // (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56019) where
+      // std::max_align_t is misplaced.
+#if defined (__GNUC__) && __GNUC__ == 4 && __GNUC_MINOR__ == 8
+      alignof(::max_align_t) >= 16
+#else
+      alignof(std::max_align_t) >= 16
+#endif
+      ? Eigen::AutoAlign : Eigen::DontAlign;
+
 #if defined(EIGEN_MAX_ALIGN_BYTES)
   // Eigen >= 3.3 supports AVX & FMA instructions that require 32-byte alignment
   // (greater for AVX512).  Rather than duplicating the detection logic, use
@@ -287,11 +295,13 @@ struct Jet {
   // Eigen < 3.3 only supported 16-byte alignment.
 #define CERES_JET_ALIGN_BYTES 16
 #endif
+
   // Default to the native alignment if 16-byte alignment is not guaranteed to
   // be supported.  We cannot use alignof(T) as if we do, GCC 4.8 complains that
   // the alignment 'is not an integer constant', although Clang accepts it.
   static constexpr size_t kAlignment = kAlignOrNot == Eigen::AutoAlign
             ? CERES_JET_ALIGN_BYTES : alignof(double);
+
 #undef CERES_JET_ALIGN_BYTES
   alignas(kAlignment) Eigen::Matrix<T, N, 1, kAlignOrNot> v;
 #endif
@@ -382,7 +392,7 @@ Jet<T, N> operator/(const Jet<T, N>& f,
   // which holds because v*v = 0.
   const T g_a_inverse = T(1.0) / g.a;
   const T f_a_by_g_a = f.a * g_a_inverse;
-  return Jet<T, N>(f.a * g_a_inverse, (f.v - f_a_by_g_a * g.v) * g_a_inverse);
+  return Jet<T, N>(f_a_by_g_a, (f.v - f_a_by_g_a * g.v) * g_a_inverse);
 }
 
 // Binary / with a scalar: s / x
@@ -426,25 +436,39 @@ CERES_DEFINE_JET_COMPARISON_OPERATOR( != )  // NOLINT
 // This is necessary because we want to use the same name (e.g. 'sqrt') for
 // double-valued and Jet-valued functions, but we are not allowed to put
 // Jet-valued functions inside namespace std.
-//
-// TODO(keir): Switch to "using".
-inline double abs     (double x) { return std::abs(x);      }
-inline double log     (double x) { return std::log(x);      }
-inline double exp     (double x) { return std::exp(x);      }
-inline double sqrt    (double x) { return std::sqrt(x);     }
-inline double cos     (double x) { return std::cos(x);      }
-inline double acos    (double x) { return std::acos(x);     }
-inline double sin     (double x) { return std::sin(x);      }
-inline double asin    (double x) { return std::asin(x);     }
-inline double tan     (double x) { return std::tan(x);      }
-inline double atan    (double x) { return std::atan(x);     }
-inline double sinh    (double x) { return std::sinh(x);     }
-inline double cosh    (double x) { return std::cosh(x);     }
-inline double tanh    (double x) { return std::tanh(x);     }
-inline double floor   (double x) { return std::floor(x);    }
-inline double ceil    (double x) { return std::ceil(x);     }
-inline double pow  (double x, double y) { return std::pow(x, y);   }
-inline double atan2(double y, double x) { return std::atan2(y, x); }
+using std::abs;
+using std::acos;
+using std::asin;
+using std::atan;
+using std::atan2;
+using std::cbrt;
+using std::ceil;
+using std::cos;
+using std::cosh;
+using std::exp;
+using std::exp2;
+using std::floor;
+using std::fmax;
+using std::fmin;
+using std::hypot;
+using std::isfinite;
+using std::isinf;
+using std::isnan;
+using std::isnormal;
+using std::log;
+using std::log2;
+using std::pow;
+using std::sin;
+using std::sinh;
+using std::sqrt;
+using std::tan;
+using std::tanh;
+
+// Legacy names from pre-C++11 days.
+inline bool IsFinite  (double x) { return std::isfinite(x); }
+inline bool IsInfinite(double x) { return std::isinf(x);    }
+inline bool IsNaN     (double x) { return std::isnan(x);    }
+inline bool IsNormal  (double x) { return std::isnormal(x); }
 
 // In general, f(a + h) ~= f(a) + f'(a) h, via the chain rule.
 
@@ -555,6 +579,55 @@ Jet<T, N> ceil(const Jet<T, N>& f) {
   return Jet<T, N>(ceil(f.a));
 }
 
+// Some new additions to C++11:
+
+// cbrt(a + h) ~= cbrt(a) + h / (3 a ^ (2/3))
+template <typename T, int N> inline
+Jet<T, N> cbrt(const Jet<T, N>& f) {
+  const T derivative = T(1.0) / (T(3.0) * cbrt(f.a * f.a));
+  return Jet<T, N>(cbrt(f.a), f.v * derivative);
+}
+
+// exp2(x + h) = 2^(x+h) ~= 2^x + h*2^x*log(2)
+template <typename T, int N> inline
+Jet<T, N> exp2(const Jet<T, N>& f) {
+  const T tmp = exp2(f.a);
+  const T derivative = tmp * log(T(2));
+  return Jet<T, N>(tmp, f.v * derivative);
+}
+
+// log2(x + h) ~= log2(x) + h / (x * log(2))
+template <typename T, int N> inline
+Jet<T, N> log2(const Jet<T, N>& f) {
+  const T derivative = T(1.0) / (f.a * log(T(2)));
+  return Jet<T, N>(log2(f.a), f.v * derivative);
+}
+
+// Like sqrt(x^2 + y^2),
+// but acts to prevent underflow/overflow for small/large x/y.
+// Note that the function is non-smooth at x=y=0,
+// so the derivative is undefined there.
+template <typename T, int N> inline
+Jet<T, N> hypot(const Jet<T, N>& x, const Jet<T, N>& y) {
+  // d/da sqrt(a) = 0.5 / sqrt(a)
+  // d/dx x^2 + y^2 = 2x
+  // So by the chain rule:
+  // d/dx sqrt(x^2 + y^2) = 0.5 / sqrt(x^2 + y^2) * 2x = x / sqrt(x^2 + y^2)
+  // d/dy sqrt(x^2 + y^2) = y / sqrt(x^2 + y^2)
+  const T tmp = hypot(x.a, y.a);
+  return Jet<T, N>(tmp, x.a / tmp * x.v + y.a / tmp * y.v);
+}
+
+template <typename T, int N> inline
+const Jet<T, N>& fmax(const Jet<T, N>& x, const Jet<T, N>& y) {
+  return x < y ? y : x;
+}
+
+template <typename T, int N> inline
+const Jet<T, N>& fmin(const Jet<T, N>& x, const Jet<T, N>& y) {
+  return y < x ? y : x;
+}
+
 // Bessel functions of the first kind with integer order equal to 0, 1, n.
 //
 // Microsoft has deprecated the j[0,1,n]() POSIX Bessel functions in favour of
@@ -614,7 +687,7 @@ Jet<T, N> BesselJn(int n, const Jet<T, N>& f) {
 }
 
 // Jet Classification. It is not clear what the appropriate semantics are for
-// these classifications. This picks that IsFinite and isnormal are "all"
+// these classifications. This picks that std::isfinite and std::isnormal are "all"
 // operations, i.e. all elements of the jet must be finite for the jet itself
 // to be finite (or normal). For IsNaN and IsInfinite, the answer is less
 // clear. This takes a "any" approach for IsNaN and IsInfinite such that if any
@@ -625,40 +698,41 @@ Jet<T, N> BesselJn(int n, const Jet<T, N>& f) {
 
 // The jet is finite if all parts of the jet are finite.
 template <typename T, int N> inline
-bool IsFinite(const Jet<T, N>& f) {
-  if (!IsFinite(f.a)) {
+bool isfinite(const Jet<T, N>& f) {
+  if (!std::isfinite(f.a)) {
     return false;
   }
   for (int i = 0; i < N; ++i) {
-    if (!IsFinite(f.v[i])) {
+    if (!std::isfinite(f.v[i])) {
       return false;
     }
   }
   return true;
 }
 
-// The jet is infinite if any part of the jet is infinite.
+// The jet is infinite if any part of the Jet is infinite.
 template <typename T, int N> inline
-bool IsInfinite(const Jet<T, N>& f) {
-  if (IsInfinite(f.a)) {
+bool isinf(const Jet<T, N>& f) {
+  if (std::isinf(f.a)) {
     return true;
   }
-  for (int i = 0; i < N; i++) {
-    if (IsInfinite(f.v[i])) {
+  for (int i = 0; i < N; ++i) {
+    if (std::isinf(f.v[i])) {
       return true;
     }
   }
   return false;
 }
 
+
 // The jet is NaN if any part of the jet is NaN.
 template <typename T, int N> inline
-bool IsNaN(const Jet<T, N>& f) {
-  if (IsNaN(f.a)) {
+bool isnan(const Jet<T, N>& f) {
+  if (std::isnan(f.a)) {
     return true;
   }
   for (int i = 0; i < N; ++i) {
-    if (IsNaN(f.v[i])) {
+    if (std::isnan(f.v[i])) {
       return true;
     }
   }
@@ -667,16 +741,38 @@ bool IsNaN(const Jet<T, N>& f) {
 
 // The jet is normal if all parts of the jet are normal.
 template <typename T, int N> inline
-bool IsNormal(const Jet<T, N>& f) {
-  if (!IsNormal(f.a)) {
+bool isnormal(const Jet<T, N>& f) {
+  if (!std::isnormal(f.a)) {
     return false;
   }
   for (int i = 0; i < N; ++i) {
-    if (!IsNormal(f.v[i])) {
+    if (!std::isnormal(f.v[i])) {
       return false;
     }
   }
   return true;
+}
+
+// Legacy functions from the pre-C++11 days.
+template <typename T, int N>
+inline bool IsFinite(const Jet<T, N>& f) {
+  return isfinite(f);
+}
+
+template <typename T, int N>
+inline bool IsNaN(const Jet<T, N>& f) {
+  return isnan(f);
+}
+
+template <typename T, int N>
+inline bool IsNormal(const Jet<T, N>& f) {
+  return isnormal(f);
+}
+
+// The jet is infinite if any part of the jet is infinite.
+template <typename T, int N> inline
+bool IsInfinite(const Jet<T, N>& f) {
+  return isinf(f);
 }
 
 // atan2(b + db, a + da) ~= atan2(b, a) + (- b da + a db) / (a^2 + b^2)
@@ -802,38 +898,6 @@ Jet<T, N> pow(const Jet<T, N>& f, const Jet<T, N>& g) {
   return Jet<T, N>(tmp1, tmp2 * f.v + tmp3 * g.v);
 }
 
-// Define the helper functions Eigen needs to embed Jet types.
-//
-// NOTE(keir): machine_epsilon() and precision() are missing, because they don't
-// work with nested template types (e.g. where the scalar is itself templated).
-// Among other things, this means that decompositions of Jet's does not work,
-// for example
-//
-//   Matrix<Jet<T, N> ... > A, x, b;
-//   ...
-//   A.solve(b, &x)
-//
-// does not work and will fail with a strange compiler error.
-//
-// TODO(keir): This is an Eigen 2.0 limitation that is lifted in 3.0. When we
-// switch to 3.0, also add the rest of the specialization functionality.
-template<typename T, int N> inline const Jet<T, N>& ei_conj(const Jet<T, N>& x) { return x;              }  // NOLINT
-template<typename T, int N> inline const Jet<T, N>& ei_real(const Jet<T, N>& x) { return x;              }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_imag(const Jet<T, N>&  ) { return Jet<T, N>(0.0); }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_abs (const Jet<T, N>& x) { return fabs(x);        }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_abs2(const Jet<T, N>& x) { return x * x;          }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_sqrt(const Jet<T, N>& x) { return sqrt(x);        }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_exp (const Jet<T, N>& x) { return exp(x);         }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_log (const Jet<T, N>& x) { return log(x);         }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_sin (const Jet<T, N>& x) { return sin(x);         }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_cos (const Jet<T, N>& x) { return cos(x);         }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_tan (const Jet<T, N>& x) { return tan(x);         }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_atan(const Jet<T, N>& x) { return atan(x);        }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_sinh(const Jet<T, N>& x) { return sinh(x);        }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_cosh(const Jet<T, N>& x) { return cosh(x);        }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_tanh(const Jet<T, N>& x) { return tanh(x);        }  // NOLINT
-template<typename T, int N> inline       Jet<T, N>  ei_pow (const Jet<T, N>& x, Jet<T, N> y) { return pow(x, y); }  // NOLINT
-
 // Note: This has to be in the ceres namespace for argument dependent lookup to
 // function correctly. Otherwise statements like CHECK_LE(x, 2.0) fail with
 // strange compile errors.
@@ -857,7 +921,7 @@ namespace Eigen {
 // Creating a specialization of NumTraits enables placing Jet objects inside
 // Eigen arrays, getting all the goodness of Eigen combined with autodiff.
 template<typename T, int N>
-struct NumTraits<ceres::Jet<T, N> > {
+struct NumTraits<ceres::Jet<T, N>> {
   typedef ceres::Jet<T, N> Real;
   typedef ceres::Jet<T, N> NonInteger;
   typedef ceres::Jet<T, N> Nested;

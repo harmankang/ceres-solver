@@ -31,9 +31,11 @@
 #include "ceres/gradient_checking_cost_function.h"
 
 #include <cmath>
+#include <cstdint>
+#include <memory>
 #include <vector>
+
 #include "ceres/cost_function.h"
-#include "ceres/internal/scoped_ptr.h"
 #include "ceres/local_parameterization.h"
 #include "ceres/loss_function.h"
 #include "ceres/parameter_block.h"
@@ -125,7 +127,7 @@ class TestTerm : public CostFunction {
 
  private:
   int arity_;
-  vector<vector<double> > a_;
+  vector<vector<double>> a_;
 };
 
 TEST(GradientCheckingCostFunction, ResidualsAndJacobiansArePreservedTest) {
@@ -161,7 +163,7 @@ TEST(GradientCheckingCostFunction, ResidualsAndJacobiansArePreservedTest) {
 
   TestTerm<-1, -1> term(arity, dim);
   GradientCheckingIterationCallback callback;
-  scoped_ptr<CostFunction> gradient_checking_cost_function(
+  std::unique_ptr<CostFunction> gradient_checking_cost_function(
       CreateGradientCheckingCostFunction(&term, NULL,
                                          kRelativeStepSize,
                                          kRelativePrecision,
@@ -218,7 +220,7 @@ TEST(GradientCheckingCostFunction, SmokeTest) {
   {
     TestTerm<1, 2> term(arity, dim);
     GradientCheckingIterationCallback callback;
-    scoped_ptr<CostFunction> gradient_checking_cost_function(
+    std::unique_ptr<CostFunction> gradient_checking_cost_function(
         CreateGradientCheckingCostFunction(&term, NULL,
                                            kRelativeStepSize,
                                            kRelativePrecision,
@@ -237,7 +239,7 @@ TEST(GradientCheckingCostFunction, SmokeTest) {
   {
     TestTerm<-1, -1> term(arity, dim);
     GradientCheckingIterationCallback callback;
-    scoped_ptr<CostFunction> gradient_checking_cost_function(
+    std::unique_ptr<CostFunction> gradient_checking_cost_function(
         CreateGradientCheckingCostFunction(&term, NULL,
                                            kRelativeStepSize,
                                            kRelativePrecision,
@@ -260,7 +262,7 @@ TEST(GradientCheckingCostFunction, SmokeTest) {
 // Trivial cost function that accepts a single argument.
 class UnaryCostFunction : public CostFunction {
  public:
-  UnaryCostFunction(int num_residuals, int32 parameter_block_size) {
+  UnaryCostFunction(int num_residuals, int32_t parameter_block_size) {
     set_num_residuals(num_residuals);
     mutable_parameter_block_sizes()->push_back(parameter_block_size);
   }
@@ -280,8 +282,8 @@ class UnaryCostFunction : public CostFunction {
 class BinaryCostFunction: public CostFunction {
  public:
   BinaryCostFunction(int num_residuals,
-                     int32 parameter_block1_size,
-                     int32 parameter_block2_size) {
+                     int32_t parameter_block1_size,
+                     int32_t parameter_block2_size) {
     set_num_residuals(num_residuals);
     mutable_parameter_block_sizes()->push_back(parameter_block1_size);
     mutable_parameter_block_sizes()->push_back(parameter_block2_size);
@@ -301,9 +303,9 @@ class BinaryCostFunction: public CostFunction {
 class TernaryCostFunction: public CostFunction {
  public:
   TernaryCostFunction(int num_residuals,
-                      int32 parameter_block1_size,
-                      int32 parameter_block2_size,
-                      int32 parameter_block3_size) {
+                      int32_t parameter_block1_size,
+                      int32_t parameter_block2_size,
+                      int32_t parameter_block3_size) {
     set_num_residuals(num_residuals);
     mutable_parameter_block_sizes()->push_back(parameter_block1_size);
     mutable_parameter_block_sizes()->push_back(parameter_block2_size);
@@ -324,8 +326,8 @@ class TernaryCostFunction: public CostFunction {
 // array and have the same LocalParameterization object.
 void ParameterBlocksAreEquivalent(const ParameterBlock*  left,
                                   const ParameterBlock* right) {
-  CHECK_NOTNULL(left);
-  CHECK_NOTNULL(right);
+  CHECK(left != nullptr);
+  CHECK(right != nullptr);
   EXPECT_EQ(left->user_state(), right->user_state());
   EXPECT_EQ(left->Size(), right->Size());
   EXPECT_EQ(left->Size(), right->Size());
@@ -358,7 +360,7 @@ TEST(GradientCheckingProblemImpl, ProblemDimensionsMatch) {
                                 NULL, z, x, y);
 
   GradientCheckingIterationCallback callback;
-  scoped_ptr<ProblemImpl> gradient_checking_problem_impl(
+  std::unique_ptr<ProblemImpl> gradient_checking_problem_impl(
       CreateGradientCheckingProblemImpl(&problem_impl, 1.0, 1.0, &callback));
 
   // The dimensions of the two problems match.
@@ -407,6 +409,39 @@ TEST(GradientCheckingProblemImpl, ProblemDimensionsMatch) {
           original_residual_block->parameter_blocks()[j],
           new_residual_block->parameter_blocks()[j]);
     }
+  }
+}
+
+
+TEST(GradientCheckingProblemImpl, ConstrainedProblemBoundsArePropagated) {
+  // Parameter blocks with arbitrarily chosen initial values.
+  double x[] = {1.0, 2.0, 3.0};
+  ProblemImpl problem_impl;
+  problem_impl.AddParameterBlock(x, 3);
+  problem_impl.AddResidualBlock(new UnaryCostFunction(2, 3), NULL, x);
+  problem_impl.SetParameterLowerBound(x,0,0.9);
+  problem_impl.SetParameterUpperBound(x,1,2.5);
+
+  GradientCheckingIterationCallback callback;
+  std::unique_ptr<ProblemImpl> gradient_checking_problem_impl(
+      CreateGradientCheckingProblemImpl(&problem_impl, 1.0, 1.0, &callback));
+
+  // The dimensions of the two problems match.
+  EXPECT_EQ(problem_impl.NumParameterBlocks(),
+            gradient_checking_problem_impl->NumParameterBlocks());
+  EXPECT_EQ(problem_impl.NumResidualBlocks(),
+            gradient_checking_problem_impl->NumResidualBlocks());
+
+  EXPECT_EQ(problem_impl.NumParameters(),
+            gradient_checking_problem_impl->NumParameters());
+  EXPECT_EQ(problem_impl.NumResiduals(),
+            gradient_checking_problem_impl->NumResiduals());
+
+  for (int i = 0; i < 3; ++i) {
+    EXPECT_EQ(problem_impl.GetParameterLowerBound(x, i),
+              gradient_checking_problem_impl->GetParameterLowerBound(x, i));
+    EXPECT_EQ(problem_impl.GetParameterUpperBound(x, i),
+              gradient_checking_problem_impl->GetParameterUpperBound(x, i));
   }
 }
 

@@ -32,6 +32,7 @@
 
 #include <algorithm>
 #include <ctime>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -45,7 +46,6 @@
 #include "ceres/conjugate_gradients_solver.h"
 #include "ceres/detect_structure.h"
 #include "ceres/internal/eigen.h"
-#include "ceres/internal/scoped_ptr.h"
 #include "ceres/lapack.h"
 #include "ceres/linear_solver.h"
 #include "ceres/sparse_cholesky.h"
@@ -131,7 +131,8 @@ LinearSolver::Summary SchurComplementSolver::SolveImpl(
                     &options_.row_block_size,
                     &options_.e_block_size,
                     &options_.f_block_size);
-    eliminator_.reset(CHECK_NOTNULL(SchurEliminatorBase::Create(options_)));
+    eliminator_.reset(SchurEliminatorBase::Create(options_));
+    CHECK(eliminator_ != nullptr);
     const bool kFullRankETE = true;
     eliminator_->Init(
         options_.elimination_groups[0], kFullRankETE, A->block_structure());
@@ -227,9 +228,7 @@ SparseSchurComplementSolver::SparseSchurComplementSolver(
     const LinearSolver::Options& options)
     : SchurComplementSolver(options) {
   if (options.type != ITERATIVE_SCHUR) {
-    sparse_cholesky_.reset(
-        SparseCholesky::Create(options.sparse_linear_algebra_library_type,
-                               options.use_postordering ? AMD : NATURAL));
+    sparse_cholesky_ = SparseCholesky::Create(options);
   }
 }
 
@@ -249,7 +248,7 @@ void SparseSchurComplementSolver::InitStorage(
     blocks_[i - num_eliminate_blocks] = bs->cols[i].size;
   }
 
-  set<pair<int, int> > block_pairs;
+  set<pair<int, int>> block_pairs;
   for (int i = 0; i < blocks_.size(); ++i) {
     block_pairs.insert(make_pair(i, i));
   }
@@ -287,7 +286,7 @@ void SparseSchurComplementSolver::InitStorage(
     }
   }
 
-  // Remaing rows do not contribute to the chunks and directly go
+  // Remaining rows do not contribute to the chunks and directly go
   // into the schur complement via an outer product.
   for (; r < num_row_blocks; ++r) {
     const CompressedRow& row = bs->rows[r];
@@ -325,7 +324,7 @@ LinearSolver::Summary SparseSchurComplementSolver::SolveReducedLinearSystem(
     return summary;
   }
 
-  scoped_ptr<CompressedRowSparseMatrix> lhs;
+  std::unique_ptr<CompressedRowSparseMatrix> lhs;
   const CompressedRowSparseMatrix::StorageType storage_type =
       sparse_cholesky_->StorageType();
   if (storage_type == CompressedRowSparseMatrix::UPPER_TRIANGULAR) {
@@ -380,16 +379,14 @@ SparseSchurComplementSolver::SolveReducedLinearSystemUsingConjugateGradients(
 
     int sc_r, sc_c, sc_row_stride, sc_col_stride;
     CellInfo* sc_cell_info =
-        CHECK_NOTNULL(sc->GetCell(i, i,
-                                  &sc_r, &sc_c,
-                                  &sc_row_stride, &sc_col_stride));
+        sc->GetCell(i, i, &sc_r, &sc_c, &sc_row_stride, &sc_col_stride);
+    CHECK(sc_cell_info != nullptr);
     MatrixRef sc_m(sc_cell_info->values, sc_row_stride, sc_col_stride);
 
     int pre_r, pre_c, pre_row_stride, pre_col_stride;
-    CellInfo* pre_cell_info = CHECK_NOTNULL(
-        preconditioner_->GetCell(i, i,
-                                 &pre_r, &pre_c,
-                                 &pre_row_stride, &pre_col_stride));
+    CellInfo* pre_cell_info = preconditioner_->GetCell(
+        i, i, &pre_r, &pre_c, &pre_row_stride, &pre_col_stride);
+    CHECK(pre_cell_info != nullptr);
     MatrixRef pre_m(pre_cell_info->values, pre_row_stride, pre_col_stride);
 
     pre_m.block(pre_r, pre_c, block_size, block_size) =
@@ -399,9 +396,9 @@ SparseSchurComplementSolver::SolveReducedLinearSystemUsingConjugateGradients(
 
   VectorRef(solution, num_rows).setZero();
 
-  scoped_ptr<LinearOperator> lhs_adapter(
+  std::unique_ptr<LinearOperator> lhs_adapter(
       new BlockRandomAccessSparseMatrixAdapter(*sc));
-  scoped_ptr<LinearOperator> preconditioner_adapter(
+  std::unique_ptr<LinearOperator> preconditioner_adapter(
       new BlockRandomAccessDiagonalMatrixAdapter(*preconditioner_));
 
 

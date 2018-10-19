@@ -32,12 +32,12 @@
 #include "ceres/problem.h"
 #include "ceres/problem_impl.h"
 
+#include <memory>
 #include "ceres/casts.h"
 #include "ceres/cost_function.h"
 #include "ceres/crs_matrix.h"
 #include "ceres/evaluator_test_utils.h"
 #include "ceres/internal/eigen.h"
-#include "ceres/internal/scoped_ptr.h"
 #include "ceres/local_parameterization.h"
 #include "ceres/loss_function.h"
 #include "ceres/map_util.h"
@@ -59,7 +59,7 @@ using std::vector;
 // Trivial cost function that accepts a single argument.
 class UnaryCostFunction : public CostFunction {
  public:
-  UnaryCostFunction(int num_residuals, int32 parameter_block_size) {
+  UnaryCostFunction(int num_residuals, int32_t parameter_block_size) {
     set_num_residuals(num_residuals);
     mutable_parameter_block_sizes()->push_back(parameter_block_size);
   }
@@ -79,8 +79,8 @@ class UnaryCostFunction : public CostFunction {
 class BinaryCostFunction: public CostFunction {
  public:
   BinaryCostFunction(int num_residuals,
-                     int32 parameter_block1_size,
-                     int32 parameter_block2_size) {
+                     int32_t parameter_block1_size,
+                     int32_t parameter_block2_size) {
     set_num_residuals(num_residuals);
     mutable_parameter_block_sizes()->push_back(parameter_block1_size);
     mutable_parameter_block_sizes()->push_back(parameter_block2_size);
@@ -100,9 +100,9 @@ class BinaryCostFunction: public CostFunction {
 class TernaryCostFunction: public CostFunction {
  public:
   TernaryCostFunction(int num_residuals,
-                      int32 parameter_block1_size,
-                      int32 parameter_block2_size,
-                      int32 parameter_block3_size) {
+                      int32_t parameter_block1_size,
+                      int32_t parameter_block2_size,
+                      int32_t parameter_block3_size) {
     set_num_residuals(num_residuals);
     mutable_parameter_block_sizes()->push_back(parameter_block1_size);
     mutable_parameter_block_sizes()->push_back(parameter_block2_size);
@@ -128,7 +128,7 @@ TEST(Problem, AddResidualWithNullCostFunctionDies) {
   problem.AddParameterBlock(z, 5);
 
   EXPECT_DEATH_IF_SUPPORTED(problem.AddResidualBlock(NULL, NULL, x),
-                            "'cost_function' Must be non NULL");
+                            "cost_function != nullptr");
 }
 
 TEST(Problem, AddResidualWithIncorrectNumberOfParameterBlocksDies) {
@@ -496,7 +496,7 @@ struct DynamicProblem : public ::testing::TestWithParam<bool> {
     ExpectParameterBlockContainsResidualBlock(values, r4);
   }
 
-  scoped_ptr<ProblemImpl> problem;
+  std::unique_ptr<ProblemImpl> problem;
   double y[4], z[5], w[3];
 };
 
@@ -1097,7 +1097,8 @@ class QuadraticCostFunction : public CostFunction {
 
 // Convert a CRSMatrix to a dense Eigen matrix.
 void CRSToDenseMatrix(const CRSMatrix& input, Matrix* output) {
-  Matrix& m = *CHECK_NOTNULL(output);
+  CHECK(output != nullptr);
+  Matrix& m = *output;
   m.resize(input.num_rows, input.num_cols);
   m.setZero();
   for (int row = 0; row < input.num_rows; ++row) {
@@ -1525,6 +1526,60 @@ TEST_F(ProblemEvaluateTest, LocalParameterization) {
                                                           constant_parameters));
 
   CheckAllEvaluationCombinations(Problem::EvaluateOptions(), expected);
+}
+
+TEST(Problem, SetAndGetParameterLowerBound) {
+  Problem problem;
+  double x[] = {1.0, 2.0};
+  problem.AddParameterBlock(x, 2);
+
+  EXPECT_EQ(problem.GetParameterLowerBound(x, 0),
+            -std::numeric_limits<double>::max());
+  EXPECT_EQ(problem.GetParameterLowerBound(x, 1),
+            -std::numeric_limits<double>::max());
+
+  problem.SetParameterLowerBound(x, 0, -1.0);
+  EXPECT_EQ(problem.GetParameterLowerBound(x, 0), -1.0);
+  EXPECT_EQ(problem.GetParameterLowerBound(x, 1),
+            -std::numeric_limits<double>::max());
+
+  problem.SetParameterLowerBound(x, 0, -2.0);
+  EXPECT_EQ(problem.GetParameterLowerBound(x, 0), -2.0);
+  EXPECT_EQ(problem.GetParameterLowerBound(x, 1),
+            -std::numeric_limits<double>::max());
+
+  problem.SetParameterLowerBound(x, 0, -std::numeric_limits<double>::max());
+  EXPECT_EQ(problem.GetParameterLowerBound(x, 0),
+            -std::numeric_limits<double>::max());
+  EXPECT_EQ(problem.GetParameterLowerBound(x, 1),
+            -std::numeric_limits<double>::max());
+}
+
+TEST(Problem, SetAndGetParameterUpperBound) {
+  Problem problem;
+  double x[] = {1.0, 2.0};
+  problem.AddParameterBlock(x, 2);
+
+  EXPECT_EQ(problem.GetParameterUpperBound(x, 0),
+            std::numeric_limits<double>::max());
+  EXPECT_EQ(problem.GetParameterUpperBound(x, 1),
+            std::numeric_limits<double>::max());
+
+  problem.SetParameterUpperBound(x, 0, -1.0);
+  EXPECT_EQ(problem.GetParameterUpperBound(x, 0), -1.0);
+  EXPECT_EQ(problem.GetParameterUpperBound(x, 1),
+            std::numeric_limits<double>::max());
+
+  problem.SetParameterUpperBound(x, 0, -2.0);
+  EXPECT_EQ(problem.GetParameterUpperBound(x, 0), -2.0);
+  EXPECT_EQ(problem.GetParameterUpperBound(x, 1),
+            std::numeric_limits<double>::max());
+
+  problem.SetParameterUpperBound(x, 0, std::numeric_limits<double>::max());
+  EXPECT_EQ(problem.GetParameterUpperBound(x, 0),
+            std::numeric_limits<double>::max());
+  EXPECT_EQ(problem.GetParameterUpperBound(x, 1),
+            std::numeric_limits<double>::max());
 }
 
 }  // namespace internal

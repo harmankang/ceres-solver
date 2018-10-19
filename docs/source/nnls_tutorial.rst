@@ -78,7 +78,7 @@ function :math:`f(x) = 10 - x`:
    struct CostFunctor {
       template <typename T>
       bool operator()(const T* const x, T* residual) const {
-        residual[0] = T(10.0) - x[0];
+        residual[0] = 10.0 - x[0];
         return true;
       }
    };
@@ -338,7 +338,7 @@ in the objective functor. Here is the code for evaluating
  struct F4 {
    template <typename T>
    bool operator()(const T* const x1, const T* const x4, T* residual) const {
-     residual[0] = T(sqrt(10.0)) * (x1[0] - x4[0]) * (x1[0] - x4[0]);
+     residual[0] = sqrt(10.0) * (x1[0] - x4[0]) * (x1[0] - x4[0]);
      return true;
    }
  };
@@ -471,7 +471,7 @@ residual. There will be a residual for each observation.
 
    template <typename T>
    bool operator()(const T* const m, const T* const c, T* residual) const {
-     residual[0] = T(y_) - exp(m[0] * T(x_) + c[0]);
+     residual[0] = y_ - exp(m[0] * x_ + c[0]);
      return true;
    }
 
@@ -621,7 +621,7 @@ instance of this object responsible for each image observation.
 
 Each residual in a BAL problem depends on a three dimensional point
 and a nine parameter camera. The nine parameters defining the camera
-are: three for rotation as a Rodriques' axis-angle vector, three
+are: three for rotation as a Rodrigues' axis-angle vector, three
 for translation, one for focal length and two for radial distortion.
 The details of this camera model can be found the `Bundler homepage
 <http://phototour.cs.washington.edu/bundler/>`_ and the `BAL homepage
@@ -653,7 +653,7 @@ The details of this camera model can be found the `Bundler homepage
      const T& l1 = camera[7];
      const T& l2 = camera[8];
      T r2 = xp*xp + yp*yp;
-     T distortion = T(1.0) + r2  * (l1 + l2  * r2);
+     T distortion = 1.0 + r2  * (l1 + l2  * r2);
 
      // Compute final projected point position.
      const T& focal = camera[6];
@@ -710,7 +710,7 @@ objective function per observation.
 Since this is a large sparse problem (well large for ``DENSE_QR``
 anyways), one way to solve this problem is to set
 :member:`Solver::Options::linear_solver_type` to
-``SPARSE_NORMAL_CHOLESKY`` and call :member:`Solve`. And while this is
+``SPARSE_NORMAL_CHOLESKY`` and call :func:`Solve`. And while this is
 a reasonable thing to do, bundle adjustment problems have a special
 sparsity structure that can be exploited to solve them much more
 efficiently. Ceres provides three specialized solvers (collectively
@@ -773,7 +773,7 @@ directory contains a number of other examples:
 #. `nist.cc
    <https://ceres-solver.googlesource.com/ceres-solver/+/master/examples/nist.cc>`_
    implements and attempts to solves the `NIST
-   <http://www.itl.nist.gov/div898/strd/nls/nls_main.shtm>`_
+   <http://www.itl.nist.gov/div898/strd/nls/nls_main.shtml>`_
    non-linear regression problems.
 
 #. `more_garbow_hillstrom.cc

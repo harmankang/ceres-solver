@@ -33,7 +33,7 @@ Why?
     space by specifying a :class:`LocalParameterization` object.
 
 * **Solver Choice** Depending on the size, sparsity structure, time &
-  memory budgets, and solution quality requiremnts, different
+  memory budgets, and solution quality requirements, different
   optimization algorithms will suit different needs. To this end,
   Ceres Solver comes with a variety of optimization algorithms:
 
@@ -54,7 +54,7 @@ Why?
     of Non-linear Conjugate Gradients, BFGS and LBFGS.
 
 * **Speed** - Ceres Solver has been extensively optimized, with C++
-  templating, hand written linear algebra routines and OpenMP or TBB
+  templating, hand written linear algebra routines and OpenMP or C++11 threads
   based multithreading of the Jacobian evaluation and the linear solvers.
 
 * **Solution Quality** Ceres is the `best performing`_ solver on the NIST

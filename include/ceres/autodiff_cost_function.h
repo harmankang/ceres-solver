@@ -30,7 +30,7 @@
 //
 // Create CostFunctions as needed by the least squares framework, with
 // Jacobians computed via automatic differentiation. For more
-// information on automatic differentation, see the wikipedia article
+// information on automatic differentiation, see the wikipedia article
 // at http://en.wikipedia.org/wiki/Automatic_differentiation
 //
 // To get an auto differentiated cost function, you must define a class with a
@@ -90,7 +90,7 @@
 //                            Dimension of x ---------------+  |
 //                            Dimension of y ------------------+
 //
-// In this example, there is usually an instance for each measumerent of k.
+// In this example, there is usually an instance for each measurement of k.
 //
 // In the instantiation above, the template parameters following
 // "MyScalarCostFunctor", "1, 2, 2", describe the functor as computing a
@@ -115,7 +115,7 @@
 // of each of them.
 //
 // WARNING #1: Since the functor will get instantiated with different types for
-// T, you must to convert from other numeric types to T before mixing
+// T, you must convert from other numeric types to T before mixing
 // computations with other variables of type T. In the example above, this is
 // seen where instead of using k_ directly, k_ is wrapped with T(k_).
 //
@@ -129,8 +129,8 @@
 #ifndef CERES_PUBLIC_AUTODIFF_COST_FUNCTION_H_
 #define CERES_PUBLIC_AUTODIFF_COST_FUNCTION_H_
 
+#include <memory>
 #include "ceres/internal/autodiff.h"
-#include "ceres/internal/scoped_ptr.h"
 #include "ceres/sized_cost_function.h"
 #include "ceres/types.h"
 #include "glog/logging.h"
@@ -138,7 +138,7 @@
 namespace ceres {
 
 // A cost function which computes the derivative of the cost with respect to
-// the parameters (a.k.a. the jacobian) using an autodifferentiation framework.
+// the parameters (a.k.a. the jacobian) using an auto differentiation framework.
 // The first template argument is the functor object, described in the header
 // comment. The second argument is the dimension of the residual (or
 // ceres::DYNAMIC to indicate it will be set at runtime), and subsequent
@@ -197,7 +197,7 @@ class AutoDiffCostFunction : public SizedCostFunction<kNumResiduals,
   // Implementation details follow; clients of the autodiff cost function should
   // not have to examine below here.
   //
-  // To handle varardic cost functions, some template magic is needed. It's
+  // To handle variadic cost functions, some template magic is needed. It's
   // mostly hidden inside autodiff.h.
   virtual bool Evaluate(double const* const* parameters,
                         double* residuals,
@@ -219,7 +219,7 @@ class AutoDiffCostFunction : public SizedCostFunction<kNumResiduals,
   }
 
  private:
-  internal::scoped_ptr<CostFunctor> functor_;
+  std::unique_ptr<CostFunctor> functor_;
 };
 
 }  // namespace ceres

@@ -44,10 +44,6 @@
 
 namespace ceres {
 
-// Basic integer types. These typedefs are in the Ceres namespace to avoid
-// conflicts with other packages having similar typedefs.
-typedef int   int32;
-
 // Argument type used in interfaces that can optionally take ownership
 // of a passed in argument. If TAKE_OWNERSHIP is passed, the called
 // object takes ownership of the pointer argument, and will call
@@ -150,7 +146,7 @@ enum SparseLinearAlgebraLibraryType {
   // minimum degree ordering.
   SUITE_SPARSE,
 
-  // A lightweight replacment for SuiteSparse, which does not require
+  // A lightweight replacement for SuiteSparse, which does not require
   // a LAPACK/BLAS implementation. Consequently, its performance is
   // also a bit lower than SuiteSparse.
   CX_SPARSE,
@@ -158,6 +154,9 @@ enum SparseLinearAlgebraLibraryType {
   // Eigen's sparse linear algebra routines. In particular Ceres uses
   // the Simplicial LDLT routines.
   EIGEN_SPARSE,
+
+  // Apple's Accelerate framework sparse linear algebra routines.
+  ACCELERATE_SPARSE,
 
   // No sparse linear solver should be used.  This does not necessarily
   // imply that Ceres was built without any sparse library, although that
@@ -202,7 +201,7 @@ enum LineSearchDirectionType {
   // symmetric matrix but only N conditions are specified by the Secant
   // equation. The requirement that the Hessian approximation be positive
   // definite imposes another N additional constraints, but that still leaves
-  // remaining degrees-of-freedom.  (L)BFGS methods uniquely deteremine the
+  // remaining degrees-of-freedom.  (L)BFGS methods uniquely determine the
   // approximate Hessian by imposing the additional constraints that the
   // approximation at the next iteration must be the 'closest' to the current
   // approximation (the nature of how this proximity is measured is actually
@@ -250,7 +249,7 @@ enum LineSearchDirectionType {
   BFGS,
 };
 
-// Nonliner conjugate gradient methods are a generalization of the
+// Nonlinear conjugate gradient methods are a generalization of the
 // method of Conjugate Gradients for linear systems. The
 // generalization can be carried out in a number of different ways
 // leading to number of different rules for computing the search

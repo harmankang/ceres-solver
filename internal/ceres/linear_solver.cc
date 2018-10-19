@@ -71,14 +71,14 @@ LinearSolverType LinearSolver::LinearSolverForZeroEBlocks(
 }
 
 LinearSolver* LinearSolver::Create(const LinearSolver::Options& options) {
+  CHECK(options.context != NULL);
+
   switch (options.type) {
     case CGNR:
       return new CgnrSolver(options);
 
     case SPARSE_NORMAL_CHOLESKY:
-#if defined(CERES_NO_SUITESPARSE) &&              \
-    defined(CERES_NO_CXSPARSE) &&                 \
-   !defined(CERES_USE_EIGEN_SPARSE)
+#if defined(CERES_NO_SPARSE)
       return NULL;
 #else
       if (options.dynamic_sparsity) {
@@ -89,9 +89,7 @@ LinearSolver* LinearSolver::Create(const LinearSolver::Options& options) {
 #endif
 
     case SPARSE_SCHUR:
-#if defined(CERES_NO_SUITESPARSE) &&                 \
-    defined(CERES_NO_CXSPARSE) &&                    \
-   !defined(CERES_USE_EIGEN_SPARSE)
+#if defined(CERES_NO_SPARSE)
       return NULL;
 #else
       return new SparseSchurComplementSolver(options);

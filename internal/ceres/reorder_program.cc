@@ -31,6 +31,7 @@
 #include "ceres/reorder_program.h"
 
 #include <algorithm>
+#include <memory>
 #include <numeric>
 #include <vector>
 
@@ -233,24 +234,19 @@ bool ApplyOrdering(const ProblemImpl::ParameterMap& parameter_map,
       program->mutable_parameter_blocks();
   parameter_blocks->clear();
 
-  const map<int, set<double*> >& groups = ordering.group_to_elements();
-  for (map<int, set<double*> >::const_iterator group_it = groups.begin();
-       group_it != groups.end();
-       ++group_it) {
-    const set<double*>& group = group_it->second;
-    for (set<double*>::const_iterator parameter_block_ptr_it = group.begin();
-         parameter_block_ptr_it != group.end();
-         ++parameter_block_ptr_it) {
-      ProblemImpl::ParameterMap::const_iterator parameter_block_it =
-          parameter_map.find(*parameter_block_ptr_it);
-      if (parameter_block_it == parameter_map.end()) {
+  const map<int, set<double*>>& groups = ordering.group_to_elements();
+  for (const auto& p : groups) {
+    const set<double*>& group = p.second;
+    for (double* parameter_block_ptr : group) {
+      auto it = parameter_map.find(parameter_block_ptr);
+      if (it == parameter_map.end()) {
         *error = StringPrintf("User specified ordering contains a pointer "
                               "to a double that is not a parameter block in "
                               "the problem. The invalid double is in group: %d",
-                              group_it->first);
+                              p.first);
         return false;
       }
-      parameter_blocks->push_back(parameter_block_it->second);
+      parameter_blocks->push_back(it->second);
     }
   }
   return true;
@@ -364,7 +360,7 @@ void MaybeReorderSchurComplementColumnsUsingSuiteSparse(
   MapValuesToContiguousRange(constraints.size(), &constraints[0]);
 
   // Compute a block sparse presentation of J'.
-  scoped_ptr<TripletSparseMatrix> tsm_block_jacobian_transpose(
+  std::unique_ptr<TripletSparseMatrix> tsm_block_jacobian_transpose(
       program->CreateJacobianBlockSparsityTranspose());
 
   cholmod_sparse* block_jacobian_transpose =
@@ -393,7 +389,7 @@ void MaybeReorderSchurComplementColumnsUsingEigen(
   return;
 #else
 
-  scoped_ptr<TripletSparseMatrix> tsm_block_jacobian_transpose(
+  std::unique_ptr<TripletSparseMatrix> tsm_block_jacobian_transpose(
       program->CreateJacobianBlockSparsityTranspose());
 
   typedef Eigen::SparseMatrix<int> SparseMatrix;
@@ -555,7 +551,7 @@ bool ReorderProgramForSparseNormalCholesky(
   }
 
   // Compute a block sparse presentation of J'.
-  scoped_ptr<TripletSparseMatrix> tsm_block_jacobian_transpose(
+  std::unique_ptr<TripletSparseMatrix> tsm_block_jacobian_transpose(
       program->CreateJacobianBlockSparsityTranspose());
 
   vector<int> ordering(program->NumParameterBlocks(), 0);
@@ -572,6 +568,15 @@ bool ReorderProgramForSparseNormalCholesky(
     OrderingForSparseNormalCholeskyUsingCXSparse(
         *tsm_block_jacobian_transpose,
         &ordering[0]);
+  } else if (sparse_linear_algebra_library_type == ACCELERATE_SPARSE) {
+    // Accelerate does not provide a function to perform reordering without
+    // performing a full symbolic factorisation.  As such, we have nothing
+    // to gain from trying to reorder the problem here, as it will happen
+    // in AppleAccelerateCholesky::Factorize() (once) and reordering here
+    // would involve performing two symbolic factorisations instead of one
+    // which would have a negative overall impact on performance.
+    return true;
+
   } else if (sparse_linear_algebra_library_type == EIGEN_SPARSE) {
 #if EIGEN_VERSION_AT_LEAST(3, 2, 2)
        OrderingForSparseNormalCholeskyUsingEigenSparse(

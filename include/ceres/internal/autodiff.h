@@ -30,7 +30,7 @@
 //
 // Computation of the Jacobian matrix for vector-valued functions of multiple
 // variables, using automatic differentiation based on the implementation of
-// dual numbers in jet.h. Before reading the rest of this file, it is adivsable
+// dual numbers in jet.h. Before reading the rest of this file, it is advisable
 // to read jet.h's header comment in detail.
 //
 // The helper wrapper AutoDiff::Differentiate() computes the jacobian of
@@ -57,7 +57,7 @@
 //                [ * ]
 //
 // Similar to the 2-parameter example for f described in jet.h, computing the
-// jacobian dy/dx is done by substutiting a suitable jet object for x and all
+// jacobian dy/dx is done by substituting a suitable jet object for x and all
 // intermediate steps of the computation of F. Since x is has 4 dimensions, use
 // a Jet<double, 4>.
 //
@@ -151,7 +151,7 @@
 namespace ceres {
 namespace internal {
 
-// Extends src by a 1st order pertubation for every dimension and puts it in
+// Extends src by a 1st order perturbation for every dimension and puts it in
 // dst. The size of src is N. Since this is also used for perturbations in
 // blocked arrays, offset is used to shift which part of the jet the
 // perturbation occurs. This is used to set up the extended x augmented by an
@@ -193,7 +193,7 @@ inline void Take1stOrderPart(const int M, const JetT *src, T *dst) {
   DCHECK(src);
   DCHECK(dst);
   for (int i = 0; i < M; ++i) {
-    Eigen::Map<Eigen::Matrix<T, N, 1> >(dst + N * i, N) =
+    Eigen::Map<Eigen::Matrix<T, N, 1>>(dst + N * i, N) =
         src[i].v.template segment<N>(N0);
   }
 }

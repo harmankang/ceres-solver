@@ -56,12 +56,12 @@
 // define the object
 //
 //   class MyScalarCostFunctor {
-//     MyScalarCostFunctor(double k): k_(k) {}
+//     explicit MyScalarCostFunctor(double k): k_(k) {}
 //
 //     bool operator()(const double* const x,
 //                     const double* const y,
 //                     double* residuals) const {
-//       residuals[0] = k_ - x[0] * y[0] + x[1] * y[1];
+//       residuals[0] = k_ - x[0] * y[0] - x[1] * y[1];
 //       return true;
 //     }
 //
@@ -161,10 +161,10 @@
 #ifndef CERES_PUBLIC_NUMERIC_DIFF_COST_FUNCTION_H_
 #define CERES_PUBLIC_NUMERIC_DIFF_COST_FUNCTION_H_
 
+#include <memory>
 #include "Eigen/Dense"
 #include "ceres/cost_function.h"
 #include "ceres/internal/numeric_diff.h"
-#include "ceres/internal/scoped_ptr.h"
 #include "ceres/numeric_diff_options.h"
 #include "ceres/sized_cost_function.h"
 #include "ceres/types.h"
@@ -223,7 +223,7 @@ class NumericDiffCostFunction
         (N0 > 0) + (N1 > 0) + (N2 > 0) + (N3 > 0) + (N4 > 0) +
         (N5 > 0) + (N6 > 0) + (N7 > 0) + (N8 > 0) + (N9 > 0);
 
-    // Get the function value (residuals) at the the point to evaluate.
+    // Get the function value (residuals) at the point to evaluate.
     if (!internal::EvaluateImpl<CostFunctor,
                                 N0, N1, N2, N3, N4, N5, N6, N7, N8, N9>(
                                     functor_.get(),
@@ -309,7 +309,7 @@ class NumericDiffCostFunction
   }
 
  private:
-  internal::scoped_ptr<CostFunctor> functor_;
+  std::unique_ptr<CostFunctor> functor_;
   Ownership ownership_;
   NumericDiffOptions options_;
 };

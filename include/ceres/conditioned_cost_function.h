@@ -36,8 +36,8 @@
 
 #include <vector>
 
+#include <memory>
 #include "ceres/cost_function.h"
-#include "ceres/internal/scoped_ptr.h"
 #include "ceres/types.h"
 #include "ceres/internal/disable_warnings.h"
 
@@ -77,6 +77,8 @@ class CERES_EXPORT ConditionedCostFunction : public CostFunction {
   // per-residual conditioner. Takes ownership of all of the wrapped cost
   // functions, or not, depending on the ownership parameter. Conditioners
   // may be NULL, in which case the corresponding residual is not modified.
+  //
+  // The conditioners can repeat.
   ConditionedCostFunction(CostFunction* wrapped_cost_function,
                           const std::vector<CostFunction*>& conditioners,
                           Ownership ownership);
@@ -87,7 +89,7 @@ class CERES_EXPORT ConditionedCostFunction : public CostFunction {
                         double** jacobians) const;
 
  private:
-  internal::scoped_ptr<CostFunction> wrapped_cost_function_;
+  std::unique_ptr<CostFunction> wrapped_cost_function_;
   std::vector<CostFunction*> conditioners_;
   Ownership ownership_;
 };

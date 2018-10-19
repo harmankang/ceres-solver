@@ -34,6 +34,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <limits>
 #include <string>
 #include <vector>
@@ -135,9 +136,12 @@ void TrustRegionMinimizer::Init(const Minimizer::Options& options,
   solver_summary_->num_unsuccessful_steps = 0;
   solver_summary_->is_constrained = options.is_constrained;
 
-  evaluator_ = CHECK_NOTNULL(options_.evaluator.get());
-  jacobian_ = CHECK_NOTNULL(options_.jacobian.get());
-  strategy_ = CHECK_NOTNULL(options_.trust_region_strategy.get());
+  CHECK(options_.evaluator != nullptr);
+  CHECK(options_.jacobian != nullptr);
+  CHECK(options_.trust_region_strategy != nullptr);
+  evaluator_ = options_.evaluator.get();
+  jacobian_ = options_.jacobian.get();
+  strategy_ = options_.trust_region_strategy.get();
 
   is_not_silent_ = !options.is_silent;
   inner_iterations_are_enabled_ =
@@ -201,7 +205,7 @@ bool TrustRegionMinimizer::IterationZero() {
     x_norm_ = x_.norm();
   }
 
-  if (!EvaluateGradientAndJacobian()) {
+  if (!EvaluateGradientAndJacobian(/*new_evaluation_point=*/true)) {
     return false;
   }
 
@@ -223,8 +227,12 @@ bool TrustRegionMinimizer::IterationZero() {
 // Returns true if all computations could be performed
 // successfully. Any failures are considered fatal and the
 // Solver::Summary is updated to indicate this.
-bool TrustRegionMinimizer::EvaluateGradientAndJacobian() {
-  if (!evaluator_->Evaluate(x_.data(),
+bool TrustRegionMinimizer::EvaluateGradientAndJacobian(
+    bool new_evaluation_point) {
+  Evaluator::EvaluateOptions evaluate_options;
+  evaluate_options.new_evaluation_point = new_evaluation_point;
+  if (!evaluator_->Evaluate(evaluate_options,
+                            x_.data(),
                             &x_cost_,
                             residuals_.data(),
                             gradient_.data(),
@@ -569,8 +577,8 @@ void TrustRegionMinimizer::DoLineSearch(const Vector& x,
   line_search_options.function = &line_search_function;
 
   std::string message;
-  scoped_ptr<LineSearch> line_search(CHECK_NOTNULL(
-      LineSearch::Create(ceres::ARMIJO, line_search_options, &message)));
+  std::unique_ptr<LineSearch> line_search(
+      LineSearch::Create(ceres::ARMIJO, line_search_options, &message));
   LineSearch::Summary line_search_summary;
   line_search_function.Init(x, *delta);
   line_search->Search(1.0, cost, gradient.dot(*delta), &line_search_summary);
@@ -746,7 +754,7 @@ bool TrustRegionMinimizer::IsStepSuccessful() {
   // small.
   //
   // This can cause the trust region loop to reject this step. To
-  // get around this, we expicitly check if the inner iterations
+  // get around this, we explicitly check if the inner iterations
   // led to a net decrease in the objective function value. If
   // they did, we accept the step even if the trust region ratio
   // is small.
@@ -768,7 +776,9 @@ bool TrustRegionMinimizer::HandleSuccessfulStep() {
   x_ = candidate_x_;
   x_norm_ = x_.norm();
 
-  if (!EvaluateGradientAndJacobian()) {
+  // Since the step was successful, this point has already had the residual
+  // evaluated (but not the jacobian). So indicate that to the evaluator.
+  if (!EvaluateGradientAndJacobian(/*new_evaluation_point=*/false)) {
     return false;
   }
 

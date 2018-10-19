@@ -35,11 +35,11 @@
 #define CERES_PUBLIC_DYNAMIC_NUMERIC_DIFF_COST_FUNCTION_H_
 
 #include <cmath>
+#include <memory>
 #include <numeric>
 #include <vector>
 
 #include "ceres/dynamic_cost_function.h"
-#include "ceres/internal/scoped_ptr.h"
 #include "ceres/internal/eigen.h"
 #include "ceres/internal/numeric_diff.h"
 #include "ceres/numeric_diff_options.h"
@@ -98,7 +98,7 @@ class DynamicNumericDiffCostFunction : public DynamicCostFunction {
         << "You must call DynamicNumericDiffCostFunction::SetNumResiduals() "
         << "before DynamicNumericDiffCostFunction::Evaluate().";
 
-    const std::vector<int32>& block_sizes = parameter_block_sizes();
+    const std::vector<int32_t>& block_sizes = parameter_block_sizes();
     CHECK(!block_sizes.empty())
         << "You must call DynamicNumericDiffCostFunction::AddParameterBlock() "
         << "before DynamicNumericDiffCostFunction::Evaluate().";
@@ -170,7 +170,7 @@ class DynamicNumericDiffCostFunction : public DynamicCostFunction {
     return functor->Evaluate(parameters, residuals, NULL);
   }
 
-  internal::scoped_ptr<const CostFunctor> functor_;
+  std::unique_ptr<const CostFunctor> functor_;
   Ownership ownership_;
   NumericDiffOptions options_;
 };

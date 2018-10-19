@@ -37,7 +37,6 @@
 // This include must come before any #ifndef check on Ceres compile options.
 #include "ceres/internal/port.h"
 
-#include "ceres/internal/macros.h"
 #include "ceres/linear_solver.h"
 
 namespace ceres {
@@ -49,6 +48,9 @@ class CompressedRowSparseMatrix;
 // sparsity is not constant across calls to Solve. This means that
 // there is no benefit to symbolically factorizing the matrix and
 // caching this factorization.
+//
+// TODO(alex): Add support for Accelerate sparse solvers:
+// https://github.com/ceres-solver/ceres-solver/issues/397
 class DynamicSparseNormalCholeskySolver
     : public CompressedRowSparseMatrixSolver {
  public:
@@ -76,7 +78,6 @@ class DynamicSparseNormalCholeskySolver
       double* rhs_and_solution);
 
   const LinearSolver::Options options_;
-  CERES_DISALLOW_COPY_AND_ASSIGN(DynamicSparseNormalCholeskySolver);
 };
 
 }  // namespace internal

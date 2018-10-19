@@ -9,7 +9,7 @@ Getting the source code
 .. _section-source:
 
 You can start with the `latest stable release
-<http://ceres-solver.org/ceres-solver-1.13.0.tar.gz>`_ . Or if you want
+<http://ceres-solver.org/ceres-solver-1.14.0.tar.gz>`_ . Or if you want
 the latest version, you can clone the git repository
 
 .. code-block:: bash
@@ -20,6 +20,12 @@ the latest version, you can clone the git repository
 
 Dependencies
 ============
+
+  .. NOTE ::
+
+    All versions of Ceres > 1.14 require a **fully C++11-compliant**
+    compiler.  In versions <= 1.14, C++11 was an optional requirement
+    controlled by the ``CXX11 [Default: OFF]`` build option.
 
 Ceres relies on a number of open source libraries, some of which are
 optional. For details on customizing the build process, see
@@ -34,8 +40,8 @@ optional. For details on customizing the build process, see
     library. Please see the documentation for ``EIGENSPARSE`` for
     more details.
 
-- `CMake <http://www.cmake.org>`_ 2.8.0 or later.
-  **Required on all platforms except for Android.**
+- `CMake <http://www.cmake.org>`_ 3.5 or later.
+  **Required on all platforms except for legacy Android.**
 
 - `glog <https://github.com/google/glog>`_ 0.3.1 or
   later. **Recommended**
@@ -50,17 +56,16 @@ optional. For details on customizing the build process, see
   to get more and more verbose and detailed information about Ceres
   internals.
 
-  Unfortunately, the current version of `google-glog
-  <https://github.com/google/glog>`_ does not build using the Android
-  NDK. So, Ceres also ships with a minimal replacement of ``glog``
-  called ``miniglog`` that can be enabled with the ``MINIGLOG`` build
-  option.
+  Ceres also ships with a minimal replacement of ``glog`` called
+  ``miniglog`` that can be enabled with the ``MINIGLOG`` build option.
+  ``miniglog`` is supplied for platforms which do not support the full
+  version of ``glog``.
 
-  So, in an attempt to reduce dependencies, it is tempting to use
-  `miniglog` on platforms other than Android. While there is nothing
-  preventing the user from doing so, we strongly recommend against
-  it. ``miniglog`` has worse performance than ``glog`` and is much
-  harder to control and use.
+  In an attempt to reduce dependencies, it may be tempting to use
+  ``miniglog`` on platforms which already support ``glog``. While
+  there is nothing preventing the user from doing so, we strongly
+  recommend against it. ``miniglog`` has worse performance than
+  ``glog`` and is much harder to control and use.
 
   .. NOTE ::
 
@@ -84,14 +89,14 @@ optional. For details on customizing the build process, see
   no dependencies on ``LAPACK`` and ``BLAS``. This makes for a simpler
   build process and a smaller binary. **Optional**
 
+- `Apple's Accelerate sparse solvers <https://developer.apple.com/documentation/accelerate/sparse_solvers>`_.
+  As of Xcode 9.0, Apple's Accelerate framework includes support for
+  solving sparse linear systems across macOS, iOS et al. **Optional**
+
 - `BLAS <http://www.netlib.org/blas/>`_ and `LAPACK
   <http://www.netlib.org/lapack/>`_ routines are needed by
   ``SuiteSparse``, and optionally used by Ceres directly for some
   operations.
-
-- `TBB <https://www.threadingbuildingblocks.org/>`_ is a C++11 template
-  library for parallel programming that optionally can be used as an
-  alternative to OpenMP. **Optional**
 
   On ``UNIX`` OSes other than Mac OS X we recommend `ATLAS
   <http://math-atlas.sourceforge.net/>`_, which includes ``BLAS`` and
@@ -159,10 +164,10 @@ We are now ready to build, test, and install Ceres.
 
 .. code-block:: bash
 
- tar zxf ceres-solver-1.13.0.tar.gz
+ tar zxf ceres-solver-1.14.0.tar.gz
  mkdir ceres-bin
  cd ceres-bin
- cmake ../ceres-solver-1.13.0
+ cmake ../ceres-solver-1.14.0
  make -j3
  make test
  # Optionally install Ceres, it can also be exported using CMake which
@@ -176,7 +181,7 @@ dataset [Agarwal]_.
 
 .. code-block:: bash
 
- bin/simple_bundle_adjuster ../ceres-solver-1.13.0/data/problem-16-22106-pre.txt
+ bin/simple_bundle_adjuster ../ceres-solver-1.14.0/data/problem-16-22106-pre.txt
 
 This runs Ceres for a maximum of 10 iterations using the
 ``DENSE_SCHUR`` linear solver. The output should look something like
@@ -193,7 +198,7 @@ this.
        5  1.803399e+04    5.33e+01    1.48e+04   1.23e+01   9.99e-01  8.33e+05       1    1.45e-01    1.08e+00
        6  1.803390e+04    9.02e-02    6.35e+01   8.00e-01   1.00e+00  2.50e+06       1    1.50e-01    1.23e+00
 
-    Ceres Solver v1.13.0 Solve Report
+    Ceres Solver v1.14.0 Solve Report
     ----------------------------------
                                          Original                  Reduced
     Parameter blocks                        22122                    22122
@@ -294,10 +299,10 @@ We are now ready to build, test, and install Ceres.
 
 .. code-block:: bash
 
-   tar zxf ceres-solver-1.13.0.tar.gz
+   tar zxf ceres-solver-1.14.0.tar.gz
    mkdir ceres-bin
    cd ceres-bin
-   cmake ../ceres-solver-1.13.0
+   cmake ../ceres-solver-1.14.0
    make -j3
    make test
    # Optionally install Ceres, it can also be exported using CMake which
@@ -325,7 +330,7 @@ following:
 
 .. code-block:: bash
 
-   tar zxf ceres-solver-1.13.0.tar.gz
+   tar zxf ceres-solver-1.14.0.tar.gz
    mkdir ceres-bin
    cd ceres-bin
    # Configure the local shell only (not persistent) to use the Homebrew LLVM
@@ -337,7 +342,7 @@ following:
    export PATH="/usr/local/opt/llvm/bin:$PATH"
    # Force CMake to use the Homebrew version of Clang.  OpenMP will be
    # automatically enabled if it is detected that the compiler supports it.
-   cmake -DCMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/usr/local/opt/llvm/bin/clang++ ../ceres-solver-1.13.0
+   cmake -DCMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/usr/local/opt/llvm/bin/clang++ ../ceres-solver-1.14.0
    make -j3
    make test
    # Optionally install Ceres.  It can also be exported using CMake which
@@ -373,7 +378,7 @@ Windows
   <https://github.com/tbennun/ceres-windows>`_ for Ceres Solver by Tal
   Ben-Nun.
 
-On Windows, we support building with Visual Studio 2010 or newer. Note
+On Windows, we support building with Visual Studio 2013 Release 4 or newer. Note
 that the Windows port is less featureful and less tested than the
 Linux or Mac OS X versions due to the lack of an officially supported
 way of building SuiteSparse and CXSparse.  There are however a number
@@ -489,9 +494,57 @@ Notes:
 Android
 =======
 
-Download the ``Android NDK`` version ``r9d`` or later. Run
-``ndk-build`` from inside the ``jni`` directory. Use the
-``libceres.a`` that gets created.
+.. NOTE::
+
+    You will need Android NDK r15 or higher to build Ceres solver.
+
+To build Ceres for Android, we need to force ``CMake`` to find
+the toolchains from the Android NDK instead of using the standard
+ones. For example, assuming you have specified ``$NDK_DIR``:
+
+.. code-block:: bash
+
+    cmake \
+    -DCMAKE_TOOLCHAIN_FILE=\
+        $NDK_DIR/build/cmake/android.toolchain.cmake \
+    -DEIGEN_INCLUDE_DIR=/path/to/eigen/header \
+    -DANDROID_ABI=armeabi-v7a \
+    -DANDROID_STL=c++_shared \
+    -DANDROID_NATIVE_API_LEVEL=android-24 \
+    -DBUILD_SHARED_LIBS=ON \
+    -DMINIGLOG=ON \
+    <PATH_TO_CERES_SOURCE>
+
+You can build for any Android STL or ABI, but the c++_shared STL
+and the armeabi-v7a or arm64-v8a ABI are recommended for 32bit
+and 64bit architectures, respectively. Several API levels may
+be supported, but it is recommended that you use the highest
+level that is suitable for your Android project.
+
+.. NOTE::
+
+    You must always use the same API level and STL library for
+    your Android project and the Ceres binaries.
+
+After building, you get a ``libceres.so`` library, which you can
+link in your Android build system by using a
+``PREBUILT_SHARED_LIBRARY`` target in your build script.
+
+If you are building any Ceres samples and would like to verify
+your library, you will need to place them in an executable public
+directory together with ``libceres.so`` on your Android device
+(e.g. in /data/local/tmp) and ensure that the STL library from
+your NDK is present in that same directory. You may then execute
+the sample by running for example:
+
+.. code-block:: bash
+    adb shell
+    cd /data/local/tmp
+    LD_LIBRARY_PATH=/data/local/tmp ./helloworld
+
+Note that any solvers or other shared dependencies you include in
+your project must also be present in your android build config and
+your test directory on Android.
 
 .. _section-ios:
 
@@ -519,6 +572,11 @@ build for ``OS`` (``armv7``, ``armv7s``, ``arm64``), ``SIMULATOR``
 (``i386``) or ``SIMULATOR64`` (``x86_64``) separately and use ``lipo``
 to merge them into one static library.  See ``cmake/iOS.cmake`` for
 more options.
+
+.. NOTE::
+
+   iOS version 11.0+ requires a 64-bit architecture, so you cannot
+   build for armv7/armv7s with iOS 11.0+ (only arm64 is supported).
 
 After building, you will get a ``libceres.a`` library, which you will
 need to add to your Xcode project.
@@ -566,6 +624,34 @@ defaults if you know what you are doing.
  ``CMake`` GUI.  If they are not present in the *Standard View*,
  toggle to the *Advanced View* with ``<t>``.
 
+
+Modifying default compilation flags
+-----------------------------------
+
+The ``CMAKE_CXX_FLAGS`` variable can be used to define additional
+default compilation flags for all build types.  Any flags specified
+in ``CMAKE_CXX_FLAGS`` will be used in addition to the default
+flags used by Ceres for the current build type.
+
+For example, if you wished to build Ceres with `-march=native
+<https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html>`_ which is not
+enabled by default (even if ``CMAKE_BUILD_TYPE=Release``) you would invoke
+CMake with:
+
+.. code-block:: bash
+
+       cmake -DCMAKE_CXX_FLAGS="-march=native" <PATH_TO_CERES_SOURCE>
+
+.. NOTE ::
+
+    The use of ``-march=native`` will limit portability, as it will tune the
+    implementation to the specific CPU of the compiling machine (e.g. use of
+    AVX if available).  Run-time segfaults may occur if you then tried to
+    run the resulting binaries on a machine with a different processor, even
+    if it is from the same family (e.g. x86) if the specific options available
+    are different.  Note that the performance gains from the use of
+    ``-march=native`` are not guaranteed to be significant.
+
 .. _options-controlling-ceres-configuration:
 
 Options controlling Ceres configuration
@@ -598,7 +684,13 @@ Options controlling Ceres configuration
 
       CXSparse is licensed under the LGPL.
 
-#. ``EIGENSPARSE [Default: OFF]``: By default, Ceres will not use
+#. ``ACCELERATESPARSE [Default: ON]``: By default, Ceres will link to
+   Apple's Accelerate framework directly if a version of it is detected
+   which supports solving sparse linear systems.  Note that on Apple OSs
+   Accelerate usually also provides the BLAS/LAPACK implementations and
+   so would be linked against irrespective of the value of ``ACCELERATESPARSE``.
+
+#. ``EIGENSPARSE [Default: ON]``: By default, Ceres will not use
    Eigen's sparse Cholesky factorization.
 
    .. NOTE::
@@ -625,66 +717,10 @@ Options controlling Ceres configuration
    gains in the ``SPARSE_SCHUR`` solver, you can disable some of the
    template specializations by turning this ``OFF``.
 
-#. ``OPENMP [Default: ON]``: On certain platforms like Android,
-   multi-threading with ``OpenMP`` is not supported. Turn this ``OFF``
-   to disable multi-threading.
-
-#. ``TBB [Default: OFF]``: An alternative to ``OpenMP`` threading library that
-   requires C++11. This option is mutually exclusive to ``OpenMP``.
-
-   .. NOTE::
-
-      Up to and including version 4.4, TBB was licensed under
-      GPL/Commercial terms.  From 2017.x versions onwards, TBB is licensed under
-      the Apache 2.0 license (and commerical terms).
-
-#. ``CXX11 [Default: OFF]`` *Non-MSVC compilers only*.
-
-   Although Ceres does not currently require C++11, it does use
-   ``shared_ptr`` (required) and ``unordered_map`` (if available);
-   both of which existed in the previous iterations of what became the
-   C++11 standard: TR1 & C++0x.  As such, Ceres can compile on
-   pre-C++11 compilers, using the TR1/C++0x versions of ``shared_ptr``
-   & ``unordered_map``.
-
-   Note that when using GCC & Clang, compiling against the TR1/C++0x
-   versions: ``CXX11=OFF`` (the default) *does not* require
-   ``-std=c++11`` when compiling Ceres, *nor* does it require that any
-   client code using Ceres use ``-std=c++11``.  However, this will
-   cause compile errors if any client code that uses Ceres also uses
-   C++11 (mismatched versions of ``shared_ptr`` & ``unordered_map``).
-
-   Enabling this option: ``CXX11=ON`` forces Ceres to use the C++11
-   versions of ``shared_ptr`` & ``unordered_map`` if they are
-   available, and thus imposes the requirement that all client code
-   using Ceres also compile with ``-std=c++11``.  This requirement is
-   handled automatically through CMake target properties on the
-   exported Ceres target for CMake >= 2.8.12 (when it was introduced).
-   Thus, any client code which uses CMake will automatically be
-   compiled with ``-std=c++11``.  **On CMake versions < 2.8.12, you
-   are responsible for ensuring that any code which uses Ceres is
-   compiled with** ``-std=c++11``.
-
-   On OS X 10.9+, Clang will use the C++11 versions of ``shared_ptr``
-   & ``unordered_map`` without ``-std=c++11`` and so this option does
-   not change the versions detected, although enabling it *will*
-   require that client code compile with ``-std=c++11``.
-
-   The following table summarises the effects of the ``CXX11`` option:
-
-   ===================  ==========  ================  ======================================
-   OS                   CXX11       Detected Version  Ceres & client code require ``-std=c++11``
-   ===================  ==========  ================  ======================================
-   Linux (GCC & Clang)  OFF         tr1               **No**
-   Linux (GCC & Clang)  ON          std               **Yes**
-   OS X 10.9+           OFF         std               **No**
-   OS X 10.9+           ON          std               **Yes**
-   ===================  ==========  ================  ======================================
-
-   The ``CXX11`` option does does not exist when using MSVC, as there
-   any new C++ features available are enabled by default, and there is
-   no analogue of ``-std=c++11``.  It will however be available on
-   MinGW & CygWin, which can support ``-std=c++11``.
+#. ``CERES_THREADING_MODEL [Default: CXX11_THREADS > OPENMP > NO_THREADS]``:
+   Multi-threading backend Ceres should be compiled with.  This will
+   automatically be set to only accept the available subset of threading
+   options in the CMake GUI.
 
 #. ``BUILD_SHARED_LIBS [Default: OFF]``: By default Ceres is built as
    a static library, turn this ``ON`` to instead build Ceres as a
@@ -814,12 +850,11 @@ used:
 
 .. code-block:: cmake
 
-    cmake_minimum_required(VERSION 2.8)
+    cmake_minimum_required(VERSION 3.5)
 
     project(helloworld)
 
     find_package(Ceres REQUIRED)
-    include_directories(${CERES_INCLUDE_DIRS})
 
     # helloworld
     add_executable(helloworld helloworld.cc)
@@ -832,6 +867,13 @@ directory containing the installed ``CeresConfig.cmake`` file
 (e.g. ``/usr/local/share/Ceres``).  If Ceres was exported, then
 ``Ceres_DIR`` should be the path to the exported Ceres build
 directory.
+
+  .. NOTE ::
+
+     You do not need to call include_directories(${CERES_INCLUDE_DIRS})
+     as the exported Ceres CMake target already contains the definitions
+     of its public include directories which will be automatically
+     included by CMake when compiling a target that links against Ceres.
 
 Specify Ceres components
 -------------------------------------
@@ -853,24 +895,24 @@ The Ceres components which can be specified are:
 
 #. ``CXSparse``: Ceres built with CXSparse (``CXSPARSE=ON``).
 
+#. ``AccelerateSparse``: Ceres built with Apple's Accelerate sparse solvers (``ACCELERATESPARSE=ON``).
+
 #. ``EigenSparse``: Ceres built with Eigen's sparse Cholesky factorization
    (``EIGENSPARSE=ON``).
 
 #. ``SparseLinearAlgebraLibrary``: Ceres built with *at least one* sparse linear
    algebra library.  This is equivalent to ``SuiteSparse`` **OR** ``CXSparse``
-   **OR** ``EigenSparse``.
+   **OR** ``AccelerateSparse``  **OR** ``EigenSparse``.
 
 #. ``SchurSpecializations``: Ceres built with Schur specializations
    (``SCHUR_SPECIALIZATIONS=ON``).
 
-#. ``OpenMP``: Ceres built with OpenMP (``OPENMP=ON``).
-
-#. ``TBB``: Ceres built with Intel Thread Building Blocks (TBB) (``TBB=ON``).
+#. ``OpenMP``: Ceres built with OpenMP (``CERES_THREADING_MODEL=OPENMP``).
 
 #. ``Multithreading``: Ceres built with *a* multithreading library.
-   This is equivalent to ``OpenMP`` **OR** ``TBB``.
+   This is equivalent to (``CERES_THREAD != NO_THREADS``).
 
-#. ``C++11``: Ceres built with C++11 (``CXX11=ON``).
+#. ``C++11``: Ceres built with C++11.
 
 To specify one/multiple Ceres components use the ``COMPONENTS`` argument to
 `find_package()
@@ -1076,7 +1118,7 @@ compiled Ceres library) directly if it is on the current list of
 search paths.  In which case, no CMake errors will occur, but ``Bar``
 will not link properly, as it does not have the required public link
 dependencies of Ceres, which are stored in the imported target
-defintion.
+definition.
 
 The solution to this is for ``Foo`` (i.e., the project that uses
 Ceres) to invoke ``find_package(Ceres)`` in ``FooConfig.cmake``, thus

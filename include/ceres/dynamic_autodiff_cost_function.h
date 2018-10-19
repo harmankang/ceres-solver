@@ -36,8 +36,8 @@
 #include <numeric>
 #include <vector>
 
+#include <memory>
 #include "ceres/dynamic_cost_function.h"
-#include "ceres/internal/scoped_ptr.h"
 #include "ceres/jet.h"
 #include "glog/logging.h"
 
@@ -57,7 +57,7 @@ namespace ceres {
 //     bool operator()(T const* const* parameters, T* residuals) const {
 //       // Use parameters[i] to access the i'th parameter block.
 //     }
-//   }
+//   };
 //
 // Since the sizing of the parameters is done at runtime, you must
 // also specify the sizes after creating the dynamic autodiff cost
@@ -103,16 +103,17 @@ class DynamicAutoDiffCostFunction : public DynamicCostFunction {
     // depends on.
     //
     // To work around this issue, the solution here is to evaluate the
-    // jacobians in a series of passes, each one computing Stripe *
+    // jacobians in a series of passes, each one computing Stride *
     // num_residuals() derivatives. This is done with small, fixed-size jets.
-    const int num_parameter_blocks = parameter_block_sizes().size();
+    const int num_parameter_blocks =
+        static_cast<int>(parameter_block_sizes().size());
     const int num_parameters = std::accumulate(parameter_block_sizes().begin(),
                                                parameter_block_sizes().end(),
                                                0);
 
     // Allocate scratch space for the strided evaluation.
-    std::vector<Jet<double, Stride> > input_jets(num_parameters);
-    std::vector<Jet<double, Stride> > output_jets(num_residuals());
+    std::vector<Jet<double, Stride>> input_jets(num_parameters);
+    std::vector<Jet<double, Stride>> output_jets(num_residuals());
 
     // Make the parameter pack that is sent to the functor (reused).
     std::vector<Jet<double, Stride>* > jet_parameters(num_parameter_blocks,
@@ -243,7 +244,7 @@ class DynamicAutoDiffCostFunction : public DynamicCostFunction {
   }
 
  private:
-  internal::scoped_ptr<CostFunctor> functor_;
+  std::unique_ptr<CostFunctor> functor_;
 };
 
 }  // namespace ceres

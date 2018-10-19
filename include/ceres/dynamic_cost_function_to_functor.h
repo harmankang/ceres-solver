@@ -32,13 +32,13 @@
 #ifndef CERES_PUBLIC_DYNAMIC_COST_FUNCTION_TO_FUNCTOR_H_
 #define CERES_PUBLIC_DYNAMIC_COST_FUNCTION_TO_FUNCTOR_H_
 
+#include <memory>
 #include <numeric>
 #include <vector>
 
 #include "ceres/dynamic_cost_function.h"
 #include "ceres/internal/fixed_array.h"
 #include "ceres/internal/port.h"
-#include "ceres/internal/scoped_ptr.h"
 
 namespace ceres {
 
@@ -105,7 +105,7 @@ class DynamicCostFunctionToFunctor {
   // Takes ownership of cost_function.
   explicit DynamicCostFunctionToFunctor(CostFunction* cost_function)
       : cost_function_(cost_function) {
-    CHECK_NOTNULL(cost_function);
+    CHECK(cost_function != nullptr);
   }
 
   bool operator()(double const* const* parameters, double* residuals) const {
@@ -114,7 +114,7 @@ class DynamicCostFunctionToFunctor {
 
   template <typename JetT>
   bool operator()(JetT const* const* inputs, JetT* output) const {
-    const std::vector<int32>& parameter_block_sizes =
+    const std::vector<int32_t>& parameter_block_sizes =
         cost_function_->parameter_block_sizes();
     const int num_parameter_blocks =
         static_cast<int>(parameter_block_sizes.size());
@@ -170,7 +170,7 @@ class DynamicCostFunctionToFunctor {
       output[i].v.setZero();
 
       for (int j = 0; j < num_parameter_blocks; ++j) {
-        const int32 block_size = parameter_block_sizes[j];
+        const int32_t block_size = parameter_block_sizes[j];
         for (int k = 0; k < parameter_block_sizes[j]; ++k) {
           output[i].v +=
               jacobian_blocks[j][i * block_size + k] * inputs[j][k].v;
@@ -182,7 +182,7 @@ class DynamicCostFunctionToFunctor {
   }
 
  private:
-  internal::scoped_ptr<CostFunction> cost_function_;
+  std::unique_ptr<CostFunction> cost_function_;
 };
 
 }  // namespace ceres

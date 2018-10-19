@@ -99,6 +99,11 @@ class SuiteSparse {
   // use the SuiteSparse machinery to allocate memory.
   cholmod_sparse CreateSparseMatrixTransposeView(CompressedRowSparseMatrix* A);
 
+  // Create a cholmod_dense vector around the contents of the array x.
+  // This is a shallow object, which refers to the contents of x and
+  // does not use the SuiteSparse machinery to allocate memory.
+  cholmod_dense CreateDenseVectorView(const double* x, int size);
+
   // Given a vector x, build a cholmod_dense vector of size out_size
   // with the first in_size entries copied from x. If x is NULL, then
   // an all zeros vector is returned. Caller owns the result.
@@ -197,12 +202,12 @@ class SuiteSparse {
   // doing sparse direct factorization of these matrices the
   // fill-reducing ordering algorithms (in particular AMD) can either
   // be run on the block or the scalar form of these matrices. The two
-  // SuiteSparse::AnalyzeCholesky methods allows the the client to
+  // SuiteSparse::AnalyzeCholesky methods allows the client to
   // compute the symbolic factorization of a matrix by either using
   // AMD on the matrix or a user provided ordering of the rows.
   //
   // But since the underlying matrices are block oriented, it is worth
-  // running AMD on just the block structre of these matrices and then
+  // running AMD on just the block structure of these matrices and then
   // lifting these block orderings to a full scalar ordering. This
   // preserves the block structure of the permuted matrix, and exposes
   // more of the super-nodal structure of the matrix to the numerical
@@ -280,7 +285,8 @@ class SuiteSparse {
 
 class SuiteSparseCholesky : public SparseCholesky {
  public:
-  static SuiteSparseCholesky* Create(const OrderingType ordering_type);
+  static std::unique_ptr<SparseCholesky> Create(
+      OrderingType ordering_type);
 
   // SparseCholesky interface.
   virtual ~SuiteSparseCholesky();
@@ -315,7 +321,7 @@ class SuiteSparse {
   // without checking for the absence of the CERES_NO_CAMD symbol.
   //
   // This is safer because the symbol maybe missing due to a user
-  // accidently not including suitesparse.h in their code when
+  // accidentally not including suitesparse.h in their code when
   // checking for the symbol.
   static bool IsConstrainedApproximateMinimumDegreeOrderingAvailable() {
     return false;

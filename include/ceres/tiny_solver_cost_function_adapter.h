@@ -32,7 +32,7 @@
 #ifndef CERES_PUBLIC_TINY_SOLVER_COST_FUNCTION_ADAPTER_H_
 #define CERES_PUBLIC_TINY_SOLVER_COST_FUNCTION_ADAPTER_H_
 
-#include <Eigen/Core>
+#include "Eigen/Core"
 #include "ceres/cost_function.h"
 #include "glog/logging.h"
 
@@ -116,7 +116,7 @@ class TinySolverCostFunctionAdapter {
     // column-major layout, and the CostFunction objects use row-major
     // Jacobian matrices. So the following bit of code does the
     // conversion from row-major Jacobians to column-major Jacobians.
-    Eigen::Map<Eigen::Matrix<double, NUM_RESIDUALS, NUM_PARAMETERS> >
+    Eigen::Map<Eigen::Matrix<double, NUM_RESIDUALS, NUM_PARAMETERS>>
         col_major_jacobian(jacobian, NumResiduals(), NumParameters());
     col_major_jacobian = row_major_jacobian_;
     return true;

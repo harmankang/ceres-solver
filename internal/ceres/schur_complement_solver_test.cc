@@ -31,12 +31,13 @@
 #include "ceres/schur_complement_solver.h"
 
 #include <cstddef>
+#include <memory>
 
 #include "ceres/block_sparse_matrix.h"
 #include "ceres/block_structure.h"
 #include "ceres/casts.h"
+#include "ceres/context_impl.h"
 #include "ceres/detect_structure.h"
-#include "ceres/internal/scoped_ptr.h"
 #include "ceres/linear_least_squares_problems.h"
 #include "ceres/linear_solver.h"
 #include "ceres/triplet_sparse_matrix.h"
@@ -50,10 +51,10 @@ namespace internal {
 class SchurComplementSolverTest : public ::testing::Test {
  protected:
   void SetUpFromProblemId(int problem_id) {
-    scoped_ptr<LinearLeastSquaresProblem> problem(
+    std::unique_ptr<LinearLeastSquaresProblem> problem(
         CreateLinearLeastSquaresProblemFromId(problem_id));
 
-    CHECK_NOTNULL(problem.get());
+    CHECK(problem != nullptr);
     A.reset(down_cast<BlockSparseMatrix*>(problem->A.release()));
     b.reset(problem->b.release());
     D.reset(problem->D.release());
@@ -68,8 +69,10 @@ class SchurComplementSolverTest : public ::testing::Test {
 
     LinearSolver::Options options;
     options.type = DENSE_QR;
+    ContextImpl context;
+    options.context = &context;
 
-    scoped_ptr<LinearSolver> qr(LinearSolver::Create(options));
+    std::unique_ptr<LinearSolver> qr(LinearSolver::Create(options));
 
     TripletSparseMatrix triplet_A(A->num_rows(),
                                   A->num_cols(),
@@ -104,13 +107,15 @@ class SchurComplementSolverTest : public ::testing::Test {
     options.sparse_linear_algebra_library_type =
         sparse_linear_algebra_library_type;
     options.use_postordering = use_postordering;
+    ContextImpl context;
+    options.context = &context;
     DetectStructure(*A->block_structure(),
                     num_eliminate_blocks,
                     &options.row_block_size,
                     &options.e_block_size,
                     &options.f_block_size);
 
-    scoped_ptr<LinearSolver> solver(LinearSolver::Create(options));
+    std::unique_ptr<LinearSolver> solver(LinearSolver::Create(options));
 
     LinearSolver::PerSolveOptions per_solve_options;
     LinearSolver::Summary summary;
@@ -137,9 +142,9 @@ class SchurComplementSolverTest : public ::testing::Test {
   int num_cols;
   int num_eliminate_blocks;
 
-  scoped_ptr<BlockSparseMatrix> A;
-  scoped_array<double> b;
-  scoped_array<double> D;
+  std::unique_ptr<BlockSparseMatrix> A;
+  std::unique_ptr<double[]> b;
+  std::unique_ptr<double[]> D;
   Vector x;
   Vector sol;
   Vector sol_d;
@@ -214,6 +219,20 @@ TEST_F(SchurComplementSolverTest,
   ComputeAndCompareSolutions(3, true, SPARSE_SCHUR, EIGEN, CX_SPARSE, true);
 }
 #endif  // CERES_NO_CXSPARSE
+
+#ifndef CERES_NO_ACCELERATE_SPARSE
+TEST_F(SchurComplementSolverTest,
+       SparseSchurWithAccelerateSparseSmallProblem) {
+  ComputeAndCompareSolutions(2, false, SPARSE_SCHUR, EIGEN, ACCELERATE_SPARSE, true);
+  ComputeAndCompareSolutions(2, true, SPARSE_SCHUR, EIGEN, ACCELERATE_SPARSE, true);
+}
+
+TEST_F(SchurComplementSolverTest,
+       SparseSchurWithAccelerateSparseLargeProblem) {
+  ComputeAndCompareSolutions(3, false, SPARSE_SCHUR, EIGEN, ACCELERATE_SPARSE, true);
+  ComputeAndCompareSolutions(3, true, SPARSE_SCHUR, EIGEN, ACCELERATE_SPARSE, true);
+}
+#endif  // CERES_NO_ACCELERATE_SPARSE
 
 #ifdef CERES_USE_EIGEN_SPARSE
 TEST_F(SchurComplementSolverTest,
